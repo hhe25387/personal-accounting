@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue'
+import { onMounted, ref } from 'vue'
 
 const selectedType = ref(null)
 const amount = ref('')
@@ -7,6 +7,7 @@ const selectedCategory = ref('')
 const transactionDate = ref('')
 const description = ref('')
 const savedTransaction = ref(null)
+const transactions = ref([])
 
 const incomeCategories = ['工资', '奖金', '兼职', '投资收益', '红包', '退款', '其他收入']
 
@@ -37,6 +38,25 @@ function goBack() {
   transactionDate.value = ''
   description.value = ''
 }
+
+async function loadTransactions() {
+  try {
+    const response = await fetch('http://localhost:3000/api/transactions')
+
+    if (!response.ok) {
+      throw new Error('读取账目失败')
+    }
+
+    transactions.value = await response.json()
+  } catch (error) {
+    console.error(error)
+    alert('无法读取账目列表')
+  }
+}
+
+onMounted(() => {
+  loadTransactions()
+})
 
 async function saveTransaction() {
   if (!amount.value || amount.value <= 0) {
@@ -79,6 +99,7 @@ async function saveTransaction() {
     }
 
     savedTransaction.value = result.transaction
+    await loadTransactions()
     alert('账目已经保存到数据库')
   } catch (error) {
     console.error(error)
@@ -144,5 +165,24 @@ async function saveTransaction() {
       <h3>准备保存的账目</h3>
       <pre>{{ savedTransaction }}</pre>
     </section>
+
+    <section>
+      <h2>账目记录</h2>
+
+      <p v-if="transactions.length === 0">目前还没有账目</p>
+
+      <ul v-else>
+        <li v-for="transaction in transactions" :key="transaction.id">
+          {{ transaction.transactionDate }}
+          |
+          {{ transaction.type === 'income' ? '收入' : '支出' }}
+          |
+          {{ transaction.category }}
+          |
+          ${{ transaction.amount }}
+        </li>
+      </ul>
+    </section>
+
   </main>
 </template>
