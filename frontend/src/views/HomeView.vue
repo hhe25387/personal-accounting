@@ -38,7 +38,7 @@ function goBack() {
   description.value = ''
 }
 
-function saveTransaction() {
+async function saveTransaction() {
   if (!amount.value || amount.value <= 0) {
     alert('请输入大于 0 的金额')
     return
@@ -54,12 +54,35 @@ function saveTransaction() {
     return
   }
 
-  savedTransaction.value = {
+  const transaction = {
     type: selectedType.value,
     amount: amount.value,
     category: selectedCategory.value,
     transactionDate: transactionDate.value,
     description: description.value,
+  }
+
+  try {
+    const response = await fetch('http://localhost:3000/api/transactions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(transaction),
+    })
+
+    const result = await response.json()
+
+    if (!response.ok) {
+      alert(result.message || '保存失败')
+      return
+    }
+
+    savedTransaction.value = result.transaction
+    alert('账目已经保存到数据库')
+  } catch (error) {
+    console.error(error)
+    alert('无法连接后端服务器')
   }
 }
 
