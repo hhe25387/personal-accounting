@@ -79,6 +79,30 @@ app.post('/api/transactions', (request, response) => {
   })
 })
 
+app.delete('/api/transactions/:id', (request, response) => {
+  const transactionId = Number(request.params.id)
+
+  if (!Number.isInteger(transactionId) || transactionId <= 0) {
+    return response.status(400).json({
+      message: '账目 ID 必须是正整数',
+    })
+  }
+
+  const result = database
+    .prepare('DELETE FROM transactions WHERE id = ?')
+    .run(transactionId)
+
+  if (result.changes === 0) {
+    return response.status(404).json({
+      message: '账目不存在',
+    })
+  }
+
+  response.json({
+    message: '账目删除成功',
+  })
+})
+
 app.listen(PORT, () => {
   console.log(`后端服务器运行在 http://localhost:${PORT}`)
 })

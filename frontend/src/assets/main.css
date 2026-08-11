@@ -1,35 +1,350 @@
 @import './base.css';
 
 #app {
-  max-width: 1280px;
+  min-height: 100vh;
+}
+
+.dashboard {
+  width: min(1120px, calc(100% - 32px));
   margin: 0 auto;
-  padding: 2rem;
-  font-weight: normal;
+  padding: 48px 0;
 }
 
-a,
-.green {
-  text-decoration: none;
-  color: hsla(160, 100%, 37%, 1);
-  transition: 0.4s;
-  padding: 3px;
+.page-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 24px;
 }
 
-@media (hover: hover) {
-  a:hover {
-    background-color: hsla(160, 100%, 37%, 0.2);
+.page-heading h1 {
+  margin: 0;
+  font-size: clamp(2rem, 4vw, 3rem);
+  line-height: 1.1;
+}
+
+.page-heading > p {
+  max-width: 340px;
+  margin: 0;
+  color: var(--muted);
+}
+
+.eyebrow {
+  margin: 0 0 6px;
+  color: var(--primary);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.summary-card {
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.summary-card span {
+  display: block;
+  color: var(--muted);
+}
+
+.summary-card strong {
+  display: block;
+  margin-top: 6px;
+  font-size: 1.6rem;
+}
+
+.summary-card--income {
+  background: linear-gradient(135deg, var(--surface), var(--income-soft));
+}
+
+.summary-card--income strong {
+  color: var(--income);
+}
+
+.summary-card--expense {
+  background: linear-gradient(135deg, var(--surface), var(--expense-soft));
+}
+
+.summary-card--expense strong {
+  color: var(--expense);
+}
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.85fr) minmax(360px, 1.15fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.panel {
+  padding: 24px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.panel-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.panel-heading h2 {
+  margin: 0;
+  font-size: 1.35rem;
+}
+
+.panel-heading > span {
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.type-selector > p,
+.transaction-form form > p {
+  margin: 0 0 14px;
+  color: var(--muted);
+}
+
+.type-selector {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.type-selector > p {
+  grid-column: 1 / -1;
+}
+
+.type-selector button {
+  padding: 13px 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease,
+    transform 160ms ease;
+}
+
+.type-selector button:first-of-type {
+  color: var(--income);
+  background: var(--income-soft);
+}
+
+.type-selector button:last-of-type {
+  color: var(--expense);
+  background: var(--expense-soft);
+}
+
+.type-selector button:hover {
+  border-color: currentColor;
+  transform: translateY(-1px);
+}
+
+.transaction-form label {
+  display: block;
+  margin: 14px 0 6px;
+  font-weight: 700;
+}
+
+.transaction-form input,
+.transaction-form select,
+.transaction-form textarea {
+  width: 100%;
+  padding: 11px 12px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  outline: none;
+  color: var(--text);
+  background: var(--surface);
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.transaction-form input:focus,
+.transaction-form select:focus,
+.transaction-form textarea:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(25, 113, 73, 0.14);
+}
+
+.transaction-form textarea {
+  min-height: 92px;
+  resize: vertical;
+}
+
+.primary-button,
+.secondary-button {
+  margin-top: 18px;
+  padding: 11px 16px;
+  border-radius: 9px;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    transform 160ms ease;
+}
+
+.primary-button {
+  border: 1px solid var(--primary);
+  color: #ffffff;
+  background: var(--primary);
+}
+
+.primary-button:hover {
+  border-color: var(--primary-dark);
+  background: var(--primary-dark);
+  transform: translateY(-1px);
+}
+
+.secondary-button {
+  margin-left: 8px;
+  border: 1px solid var(--border);
+  color: var(--text);
+  background: var(--surface);
+}
+
+.secondary-button:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.transaction-list ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.transaction-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.transaction-row:first-child {
+  padding-top: 0;
+}
+
+.transaction-row:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.transaction-row strong {
+  font-size: 1rem;
+}
+
+.transaction-row p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.transaction-actions {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 12px;
+}
+
+.transaction-amount {
+  font-size: 1rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.transaction-amount--income {
+  color: var(--income);
+}
+
+.transaction-amount--expense {
+  color: var(--expense);
+}
+
+.delete-button {
+  padding: 6px 10px;
+  border: 1px solid var(--expense);
+  border-radius: 8px;
+  color: var(--expense);
+  background: var(--expense-soft);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    color 0.2s ease,
+    background 0.2s ease,
+    transform 0.2s ease;
+}
+
+.delete-button:hover {
+  color: var(--surface);
+  background: var(--expense);
+  transform: translateY(-1px);
+}
+
+.delete-button:focus-visible {
+  outline: 3px solid var(--expense-soft);
+  outline-offset: 2px;
+}
+
+.empty-state {
+  margin: 0;
+  padding: 32px 16px;
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  color: var(--muted);
+  text-align: center;
+  background: var(--page-bg);
+}
+
+@media (max-width: 760px) {
+  .dashboard {
+    width: min(100% - 24px, 620px);
+    padding: 28px 0;
   }
-}
 
-@media (min-width: 1024px) {
-  body {
-    display: flex;
-    place-items: center;
+  .page-heading {
+    display: block;
   }
 
-  #app {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    padding: 0 2rem;
+  .page-heading > p {
+    margin-top: 10px;
+  }
+
+  .summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .panel {
+    padding: 20px;
+  }
+
+  .transaction-row {
+    align-items: flex-start;
   }
 }

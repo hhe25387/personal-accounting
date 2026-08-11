@@ -36,4 +36,37 @@ describe('TransactionList', () => {
     expect(wrapper.get('.transaction-amount--income').text()).toBe('+$12.00')
     expect(wrapper.get('.transaction-amount--expense').text()).toBe('-$25.50')
   })
+
+  it('点击删除按钮时传出对应账目的 ID', async () => {
+    const wrapper = mount(TransactionList, {
+      props: {
+        transactions: [
+          {
+            id: 1,
+            type: 'income',
+            amount: 12,
+            category: '兼职',
+            transactionDate: '2026-08-10',
+            description: '',
+          },
+          {
+            id: 2,
+            type: 'expense',
+            amount: 25.5,
+            category: '餐饮',
+            transactionDate: '2026-08-09',
+            description: '早餐',
+          },
+        ],
+      },
+    })
+
+    const deleteButtons = wrapper.findAll(
+      '[data-test="delete-transaction"]',
+    )
+
+    await deleteButtons[1].trigger('click')
+
+    expect(wrapper.emitted('delete')).toEqual([[2]])
+  })
 })

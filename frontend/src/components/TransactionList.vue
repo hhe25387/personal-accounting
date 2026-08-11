@@ -6,6 +6,8 @@ defineProps({
   },
 })
 
+const emit = defineEmits(['delete'])
+
 function formatAmount(transaction) {
   const sign = transaction.type === 'income' ? '+' : '-'
   return `${sign}$${Number(transaction.amount).toFixed(2)}`
@@ -44,12 +46,24 @@ function formatAmount(transaction) {
           </p>
         </div>
 
-        <span
-          class="transaction-amount"
-          :class="`transaction-amount--${transaction.type}`"
-        >
-          {{ formatAmount(transaction) }}
-        </span>
+        <div class="transaction-actions">
+          <span
+            class="transaction-amount"
+            :class="`transaction-amount--${transaction.type}`"
+          >
+            {{ formatAmount(transaction) }}
+          </span>
+
+          <button
+            type="button"
+            class="delete-button"
+            data-test="delete-transaction"
+            :aria-label="`删除${transaction.category}账目`"
+            @click="emit('delete', transaction.id)"
+          >
+            删除
+          </button>
+        </div>
       </li>
     </ul>
   </section>
