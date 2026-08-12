@@ -6,7 +6,7 @@ defineProps({
   },
 })
 
-const emit = defineEmits(['delete'])
+const emit = defineEmits(['edit', 'delete'])
 
 function formatAmount(transaction) {
   const sign = transaction.type === 'income' ? '+' : '-'
@@ -53,6 +53,16 @@ function formatAmount(transaction) {
           >
             {{ formatAmount(transaction) }}
           </span>
+
+          <button
+            type="button"
+            class="edit-button"
+            data-test="edit-transaction"
+            :aria-label="`编辑${transaction.category}账目`"
+            @click="emit('edit', transaction)"
+          >
+            编辑
+          </button>
 
           <button
             type="button"

@@ -282,6 +282,32 @@
   color: var(--expense);
 }
 
+.edit-button {
+  padding: 6px 10px;
+  border: 1px solid var(--primary);
+  border-radius: 8px;
+  color: var(--primary);
+  background: var(--income-soft);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    color 0.2s ease,
+    background 0.2s ease,
+    transform 0.2s ease;
+}
+
+.edit-button:hover {
+  color: var(--surface);
+  background: var(--primary);
+  transform: translateY(-1px);
+}
+
+.edit-button:focus-visible {
+  outline: 3px solid var(--income-soft);
+  outline-offset: 2px;
+}
+
 .delete-button {
   padding: 6px 10px;
   border: 1px solid var(--expense);

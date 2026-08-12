@@ -1,7 +1,14 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 
-const emit = defineEmits(['submit'])
+const props = defineProps({
+  editingTransaction: {
+    type: Object,
+    default: null,
+  },
+})
+
+const emit = defineEmits(['submit', 'cancel'])
 
 const selectedType = ref(null)
 const amount = ref('')
@@ -48,6 +55,36 @@ function goBack() {
   resetFields()
 }
 
+function changeType(type) {
+  if (selectedType.value !== type) {
+    selectedCategory.value = ''
+  }
+
+  selectedType.value = type
+}
+
+function cancelEditing() {
+  emit('cancel')
+  goBack()
+}
+
+watch(
+  () => props.editingTransaction,
+  (transaction) => {
+    if (!transaction) {
+      goBack()
+      return
+    }
+
+    selectedType.value = transaction.type
+    amount.value = transaction.amount
+    selectedCategory.value = transaction.category
+    transactionDate.value = transaction.transactionDate
+    description.value = transaction.description || ''
+  },
+  { immediate: true },
+)
+
 function submitTransaction() {
   if (!amount.value || amount.value <= 0) {
     alert('请输入大于 0 的金额')
@@ -78,8 +115,12 @@ function submitTransaction() {
   <section class="panel transaction-form">
     <div class="panel-heading">
       <div>
-        <p class="eyebrow">NEW ENTRY</p>
-        <h2>记录一笔账目</h2>
+        <p class="eyebrow">
+          {{ editingTransaction ? 'EDIT ENTRY' : 'NEW ENTRY' }}
+        </p>
+        <h2>
+          {{ editingTransaction ? '编辑账目' : '记录一笔账目' }}
+        </h2>
       </div>
     </div>
 
@@ -104,6 +145,24 @@ function submitTransaction() {
         当前类型：
         {{ selectedType === 'income' ? '收入' : '支出' }}
       </p>
+
+      <div v-if="editingTransaction" class="edit-type-selector">
+        <button
+          type="button"
+          :aria-pressed="selectedType === 'income'"
+          @click="changeType('income')"
+        >
+          收入
+        </button>
+
+        <button
+          type="button"
+          :aria-pressed="selectedType === 'expense'"
+          @click="changeType('expense')"
+        >
+          支出
+        </button>
+      </div>
 
       <label for="amount">金额</label>
       <input
@@ -148,10 +207,20 @@ function submitTransaction() {
       ></textarea>
 
       <button type="submit" class="primary-button">
-        保存账目
+        {{ editingTransaction ? '保存修改' : '保存账目' }}
       </button>
 
       <button
+        v-if="editingTransaction"
+        type="button"
+        class="secondary-button"
+        @click="cancelEditing"
+      >
+        取消编辑
+      </button>
+
+      <button
+        v-else
         type="button"
         class="secondary-button"
         @click="goBack"

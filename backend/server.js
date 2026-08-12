@@ -1,6 +1,11 @@
 const cors = require('cors')
 const express = require('express')
-const database = require('./database')
+const {
+  createTransaction,
+  deleteTransaction,
+  getAllTransactions,
+  updateTransaction,
+} = require('./transactionService')
 
 const app = express()
 const PORT = 3000
@@ -15,25 +20,7 @@ app.get('/api/health', (request, response) => {
 })
 
 app.get('/api/transactions', (request, response) => {
-  const rows = database
-    .prepare(`
-      SELECT *
-      FROM transactions
-      ORDER BY transaction_date DESC, id DESC
-    `)
-    .all()
-
-  const transactions = rows.map((row) => ({
-    id: row.id,
-    type: row.type,
-    amount: row.amount_cents / 100,
-    category: row.category,
-    transactionDate: row.transaction_date,
-    description: row.description,
-    createdAt: row.created_at,
-  }))
-
-  response.json(transactions)
+  response.json(getAllTransactions())
 })
 
 app.post('/api/transactions', (request, response) => {
@@ -45,37 +32,61 @@ app.post('/api/transactions', (request, response) => {
     })
   }
 
-  const amountCents = Math.round(Number(amount) * 100)
-
-  const insertTransaction = database.prepare(`
-    INSERT INTO transactions (
-      type,
-      amount_cents,
-      category,
-      transaction_date,
-      description
-    )
-    VALUES (?, ?, ?, ?, ?)
-  `)
-
-  const result = insertTransaction.run(
+  const transaction = createTransaction({
     type,
-    amountCents,
+    amount,
     category,
     transactionDate,
-    description || null,
-  )
+    description,
+  })
 
   response.status(201).json({
     message: '账目保存成功',
-    transaction: {
-      id: result.lastInsertRowid,
-      type,
-      amount,
-      category,
-      transactionDate,
-      description,
-    },
+    transaction,
+  })
+})
+
+app.put('/api/transactions/:id', (request, response) => {
+  const transactionId = Number(request.params.id)
+  const { type, amount, category, transactionDate, description } = request.body
+
+  if (!Number.isInteger(transactionId) || transactionId <= 0) {
+    return response.status(400).json({
+      message: '账目 ID 必须是正整数',
+    })
+  }
+
+  if (!type || amount === '' || amount == null || !category || !transactionDate) {
+    return response.status(400).json({
+      message: '类型、金额、分类和日期不能为空',
+    })
+  }
+
+  const amountNumber = Number(amount)
+
+  if (!Number.isFinite(amountNumber) || amountNumber <= 0) {
+    return response.status(400).json({
+      message: '金额必须大于 0',
+    })
+  }
+
+  const transaction = updateTransaction(transactionId, {
+    type,
+    amount: amountNumber,
+    category,
+    transactionDate,
+    description,
+  })
+
+  if (!transaction) {
+    return response.status(404).json({
+      message: '账目不存在',
+    })
+  }
+
+  response.json({
+    message: '账目修改成功',
+    transaction,
   })
 })
 
@@ -88,11 +99,9 @@ app.delete('/api/transactions/:id', (request, response) => {
     })
   }
 
-  const result = database
-    .prepare('DELETE FROM transactions WHERE id = ?')
-    .run(transactionId)
+  const wasDeleted = deleteTransaction(transactionId)
 
-  if (result.changes === 0) {
+  if (!wasDeleted) {
     return response.status(404).json({
       message: '账目不存在',
     })

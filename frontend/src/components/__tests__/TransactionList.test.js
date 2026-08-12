@@ -69,4 +69,25 @@ describe('TransactionList', () => {
 
     expect(wrapper.emitted('delete')).toEqual([[2]])
   })
+
+  it('点击编辑按钮时传出对应的完整账目', async () => {
+    const transaction = {
+      id: 3,
+      type: 'income',
+      amount: 500,
+      category: '工资',
+      transactionDate: '2026-08-11',
+      description: '八月工资',
+    }
+
+    const wrapper = mount(TransactionList, {
+      props: {
+        transactions: [transaction],
+      },
+    })
+
+    await wrapper.get('[data-test="edit-transaction"]').trigger('click')
+
+    expect(wrapper.emitted('edit')).toEqual([[transaction]])
+  })
 })
