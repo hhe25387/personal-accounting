@@ -1,14 +1,30 @@
+const loadEnvironment = require('./config/loadEnvironment')
+
+loadEnvironment()
+
 const cors = require('cors')
 const express = require('express')
+const createAccountingAgent = require('./agent/createAccountingAgent')
+const createProvider = require('./agent/providers/createProvider')
+const loadAgentConfig = require('./config/agentConfig')
+const database = require('./database')
+const createTransactionService = require('./transactionService')
+
+const agentConfig = loadAgentConfig()
+const transactionService = createTransactionService(database)
 const {
   createTransaction,
   deleteTransaction,
   getAllTransactions,
   updateTransaction,
-} = require('./transactionService')
+} = transactionService
+const accountingAgent = createAccountingAgent({
+  provider: createProvider(agentConfig),
+  transactionService,
+})
 
 const app = express()
-const PORT = 3000
+const PORT = Number(process.env.PORT) || 3000
 
 app.use(cors())
 app.use(express.json())
@@ -21,6 +37,26 @@ app.get('/api/health', (request, response) => {
 
 app.get('/api/transactions', (request, response) => {
   response.json(getAllTransactions())
+})
+
+app.post('/api/assistant', async (request, response) => {
+  const { message } = request.body
+
+  if (typeof message !== 'string' || message.trim() === '') {
+    return response.status(400).json({
+      message: '消息不能为空',
+    })
+  }
+
+  try {
+    const result = await accountingAgent.run(message)
+    response.json(result)
+  } catch (error) {
+    console.error('Agent 处理失败：', error)
+    response.status(500).json({
+      message: 'Agent 暂时无法处理这个问题',
+    })
+  }
 })
 
 app.post('/api/transactions', (request, response) => {
@@ -114,4 +150,5 @@ app.delete('/api/transactions/:id', (request, response) => {
 
 app.listen(PORT, () => {
   console.log(`后端服务器运行在 http://localhost:${PORT}`)
+  console.log(`财务助手正在使用 ${agentConfig.providerName} Provider`)
 })

@@ -1,6 +1,7 @@
 <script setup>
 import { onMounted, ref } from 'vue'
 
+import AgentChat from '@/components/AgentChat.vue'
 import SummaryCards from '@/components/SummaryCards.vue'
 import TransactionForm from '@/components/TransactionForm.vue'
 import TransactionList from '@/components/TransactionList.vue'
@@ -170,4 +171,6 @@ onMounted(() => {
       />
     </section>
   </main>
+
+  <AgentChat />
 </template>
