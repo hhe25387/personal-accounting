@@ -1,5 +1,8 @@
 <script setup>
 import { nextTick, ref } from 'vue'
+import { useI18n } from '@/i18n'
+
+const { language, t } = useI18n()
 
 const isOpen = ref(false)
 const inputMessage = ref('')
@@ -8,15 +11,16 @@ const messageList = ref(null)
 const messages = ref([
   {
     role: 'assistant',
-    content:
-      '你好，我是你的财务助手。你可以问我最近账目、收支汇总，或者哪个分类花得最多。',
+    content: 'Hi, I am your financial assistant. Ask about recent transactions, totals, or your top spending category.',
   },
 ])
 
 const quickQuestions = [
-  '最近有哪些账目？',
-  '总收入和总支出是多少？',
-  '哪个板块花得最多？',
+  'What are my recent transactions?',
+  'What are my total income and expenses?',
+  'Which category has the most spending?',
+  'How is this month different from last month?',
+  'Summarize this month and give me one practical suggestion.',
 ]
 
 async function scrollToLatestMessage() {
@@ -54,26 +58,31 @@ async function sendMessage(message = inputMessage.value) {
   try {
     const response = await fetch('http://localhost:3000/api/assistant', {
       method: 'POST',
+      credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ message: normalizedMessage }),
+      body: JSON.stringify({
+        message: normalizedMessage,
+        language: language.value,
+      }),
     })
     const result = await response.json()
 
     if (!response.ok) {
-      throw new Error(result.message || '财务助手暂时无法回答')
+      throw new Error(result.message || 'The financial assistant cannot answer right now')
     }
 
     messages.value.push({
       role: 'assistant',
       content: result.answer,
+      grounding: result.grounding || null,
     })
   } catch (error) {
     console.error(error)
     messages.value.push({
       role: 'assistant',
-      content: '暂时无法连接财务助手，请确认后端已经启动。',
+      content: t('Cannot connect to the financial assistant. Make sure the backend is running.'),
       isError: true,
     })
   } finally {
@@ -89,11 +98,11 @@ async function sendMessage(message = inputMessage.value) {
     type="button"
     class="agent-launcher"
     data-test="open-agent"
-    aria-label="打开财务助手"
+    :aria-label="t('Open financial assistant')"
     @click="openChat"
   >
     <span aria-hidden="true">✦</span>
-    财务助手
+    {{ t('Financial Assistant') }}
   </button>
 
   <div v-if="isOpen" class="agent-backdrop" @click="closeChat"></div>
@@ -101,30 +110,30 @@ async function sendMessage(message = inputMessage.value) {
   <aside
     v-if="isOpen"
     class="agent-drawer"
-    aria-label="财务助手聊天窗口"
+    :aria-label="t('Financial assistant chat')"
   >
     <header class="agent-header">
       <div>
         <div class="agent-title-row">
           <span class="agent-status" aria-hidden="true"></span>
-          <h2>财务助手</h2>
-          <span class="agent-badge">只读模式</span>
+          <h2>{{ t('Financial Assistant') }}</h2>
+          <span class="agent-badge">{{ t('Read-only') }}</span>
         </div>
-        <p>只读分析你的账目，不会修改数据</p>
+        <p>{{ t('Analyzes your transactions without changing data') }}</p>
       </div>
 
       <button
         type="button"
         class="agent-close"
         data-test="close-agent"
-        aria-label="关闭财务助手"
+        :aria-label="t('Close financial assistant')"
         @click="closeChat"
       >
         ×
       </button>
     </header>
 
-    <div class="agent-quick-questions" aria-label="快捷问题">
+    <div class="agent-quick-questions" :aria-label="t('Suggested questions')">
       <button
         v-for="question in quickQuestions"
         :key="question"
@@ -132,7 +141,7 @@ async function sendMessage(message = inputMessage.value) {
         :disabled="isLoading"
         @click="sendMessage(question)"
       >
-        {{ question }}
+        {{ t(question) }}
       </button>
     </div>
 
@@ -146,25 +155,33 @@ async function sendMessage(message = inputMessage.value) {
           { 'agent-message--error': message.isError },
         ]"
       >
-        <span>{{ message.role === 'user' ? '你' : '助手' }}</span>
-        <p>{{ message.content }}</p>
+        <span>{{ t(message.role === 'user' ? 'You' : 'Assistant') }}</span>
+        <p>{{ t(message.content) }}</p>
+        <small v-if="message.grounding" class="agent-grounding">
+          <span aria-hidden="true">✓</span>
+          {{ t('Verified from your ledger') }}
+          ·
+          {{ message.grounding.evidenceCount ? (language === 'zh' ? `${message.grounding.evidenceCount} 笔` : `${message.grounding.evidenceCount} entries`) : t('No transactions were used') }}
+          ·
+          {{ t('Read-only analysis') }}
+        </small>
       </div>
 
       <div v-if="isLoading" class="agent-message agent-message--assistant">
-        <span>助手</span>
-        <p class="agent-typing">正在分析<span>…</span></p>
+        <span>{{ t('Assistant') }}</span>
+        <p class="agent-typing">{{ t('Analyzing') }}<span>…</span></p>
       </div>
     </div>
 
     <form class="agent-composer" @submit.prevent="sendMessage()">
       <label class="visually-hidden" for="agent-message">
-        输入财务问题
+        {{ t('Ask a financial question') }}
       </label>
       <textarea
         id="agent-message"
         v-model="inputMessage"
         rows="2"
-        placeholder="例如：哪个板块花得最多？"
+        :placeholder="t('e.g. Which category has the most spending?')"
         :disabled="isLoading"
         @keydown.enter.exact.prevent="sendMessage()"
       ></textarea>
@@ -173,7 +190,7 @@ async function sendMessage(message = inputMessage.value) {
         data-test="send-agent-message"
         :disabled="isLoading || !inputMessage.trim()"
       >
-        {{ isLoading ? '分析中' : '发送' }}
+        {{ t(isLoading ? 'Analyzing' : 'Send') }}
       </button>
     </form>
   </aside>

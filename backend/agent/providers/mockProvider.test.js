@@ -7,7 +7,7 @@ describe('mockProvider', () => {
   it('分类问题选择分类统计工具', async () => {
     const provider = createMockProvider()
 
-    assert.deepEqual(await provider.decide({ message: '哪个板块花得最多？' }), {
+    assert.deepEqual(await provider.decide({ message: 'Which category has the most spending?' }), {
       type: 'tool_call',
       toolName: 'get_category_breakdown',
       input: { type: 'expense' },
@@ -23,6 +23,23 @@ describe('mockProvider', () => {
       ],
     })
 
-    assert.equal(answer, '餐饮是支出最多的分类，共 $120.50，占 60.25%。')
+    assert.equal(answer, '餐饮 is the top spending category at $120.50, representing 60.25%.')
+  })
+
+  it('识别中文分类、月度比较和总结建议问题', async () => {
+    const provider = createMockProvider()
+
+    assert.equal(
+      (await provider.decide({ message: '哪个分类支出最多？', context: { language: 'zh' } })).toolName,
+      'get_category_breakdown',
+    )
+    assert.equal(
+      (await provider.decide({ message: '这个月和上个月相比怎么样？', context: { language: 'zh' } })).toolName,
+      'compare_months',
+    )
+    assert.equal(
+      (await provider.decide({ message: '总结本月并给我省钱建议', context: { language: 'zh' } })).toolName,
+      'get_monthly_overview',
+    )
   })
 })

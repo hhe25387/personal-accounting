@@ -33,8 +33,8 @@ describe('TransactionList', () => {
     expect(wrapper.text()).toContain('兼职')
     expect(wrapper.text()).toContain('早餐')
 
-    expect(wrapper.get('.transaction-amount--income').text()).toBe('+$12.00')
-    expect(wrapper.get('.transaction-amount--expense').text()).toBe('-$25.50')
+    expect(wrapper.get('.transaction-amount--income').text()).toBe('+¥12.00')
+    expect(wrapper.get('.transaction-amount--expense').text()).toBe('-¥25.50')
   })
 
   it('点击删除按钮时传出对应账目的 ID', async () => {

@@ -7,6 +7,6 @@ const database = new Database(databasePath)
 
 initializeDatabase(database)
 
-console.log('数据库和 transactions 表创建成功')
+console.log('Database, transactions, and categories initialized')
 
 module.exports = database

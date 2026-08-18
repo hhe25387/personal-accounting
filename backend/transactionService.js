@@ -13,21 +13,26 @@ function formatTransaction(row) {
 const allowedFilterNames = new Set([
   'type',
   'category',
+  'keyword',
   'startDate',
   'endDate',
   'limit',
+  'offset',
+  'sortBy',
+  'sortOrder',
+  'userId',
 ])
 
 function validateDate(date, fieldName) {
   if (date !== undefined && !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-    throw new TypeError(`${fieldName} 必须使用 YYYY-MM-DD 格式`)
+    throw new TypeError(`${fieldName}  must use YYYY-MM-DD format`)
   }
 }
 
 function normalizeFilters(filters = {}) {
   for (const filterName of Object.keys(filters)) {
     if (!allowedFilterNames.has(filterName)) {
-      throw new TypeError(`不支持筛选字段：${filterName}`)
+      throw new TypeError(`Unsupported filter: ${filterName}`)
     }
   }
 
@@ -35,43 +40,87 @@ function normalizeFilters(filters = {}) {
     filters.type !== undefined &&
     !['income', 'expense'].includes(filters.type)
   ) {
-    throw new TypeError('type 必须是 income 或 expense')
+    throw new TypeError('type must be income or expense')
   }
 
   if (
     filters.category !== undefined &&
     (typeof filters.category !== 'string' || filters.category.trim() === '')
   ) {
-    throw new TypeError('category 必须是非空字符串')
+    throw new TypeError('category must be a non-empty string')
+  }
+
+  if (
+    filters.keyword !== undefined &&
+    (typeof filters.keyword !== 'string' ||
+      filters.keyword.trim() === '' ||
+      filters.keyword.trim().length > 80)
+  ) {
+    throw new TypeError('keyword must be 1 to 80 characters')
   }
 
   validateDate(filters.startDate, 'startDate')
   validateDate(filters.endDate, 'endDate')
 
   if (
+    filters.userId !== undefined &&
+    (!Number.isInteger(filters.userId) || filters.userId <= 0)
+  ) {
+    throw new TypeError('userId  must be a positive integer')
+  }
+
+  if (
+    filters.sortBy !== undefined &&
+    !['date', 'amount'].includes(filters.sortBy)
+  ) {
+    throw new TypeError('sortBy must be date or amount')
+  }
+
+  if (
+    filters.sortOrder !== undefined &&
+    !['asc', 'desc'].includes(filters.sortOrder)
+  ) {
+    throw new TypeError('sortOrder must be asc or desc')
+  }
+
+  if (
     filters.startDate &&
     filters.endDate &&
     filters.startDate > filters.endDate
   ) {
-    throw new TypeError('startDate 不能晚于 endDate')
+    throw new TypeError('startDate cannot be after endDate')
   }
 
   const limit = filters.limit === undefined ? 100 : Number(filters.limit)
 
   if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
-    throw new TypeError('limit 必须是 1 到 100 之间的整数')
+    throw new TypeError('limit must be an integer from 1 to 100')
+  }
+
+  const offset = filters.offset === undefined ? 0 : Number(filters.offset)
+  if (!Number.isInteger(offset) || offset < 0) {
+    throw new TypeError('offset must be an integer greater than or equal to 0')
   }
 
   return {
     ...filters,
     category: filters.category?.trim(),
+    keyword: filters.keyword?.trim(),
     limit,
+    offset,
+    sortBy: filters.sortBy || 'date',
+    sortOrder: filters.sortOrder || 'desc',
   }
 }
 
 function buildWhereClause(filters) {
   const conditions = []
   const parameters = []
+
+  if (filters.userId) {
+    conditions.push('user_id = ?')
+    parameters.push(filters.userId)
+  }
 
   if (filters.type) {
     conditions.push('type = ?')
@@ -81,6 +130,14 @@ function buildWhereClause(filters) {
   if (filters.category) {
     conditions.push('category = ?')
     parameters.push(filters.category)
+  }
+
+  if (filters.keyword) {
+    const escapedKeyword = filters.keyword.replace(/[\\%_]/g, '\\$&')
+    conditions.push(
+      `(category LIKE ? ESCAPE '\\' OR COALESCE(description, '') LIKE ? ESCAPE '\\')`,
+    )
+    parameters.push(`%${escapedKeyword}%`, `%${escapedKeyword}%`)
   }
 
   if (filters.startDate) {
@@ -99,15 +156,37 @@ function buildWhereClause(filters) {
   }
 }
 
+function buildOrderClause(filters) {
+  const direction = filters.sortOrder === 'asc' ? 'ASC' : 'DESC'
+  if (filters.sortBy === 'amount') {
+    return `ORDER BY amount_cents ${direction}, transaction_date DESC, id DESC`
+  }
+  return `ORDER BY transaction_date ${direction}, id ${direction}`
+}
+
 function createTransactionService(database) {
-  function getAllTransactions() {
+  function getTransactionById(transactionId, userId) {
+    const ownershipClause = userId ? ' AND user_id = ?' : ''
+    const parameters = userId ? [transactionId, userId] : [transactionId]
+    const row = database
+      .prepare(`SELECT * FROM transactions WHERE id = ?${ownershipClause}`)
+      .get(...parameters)
+
+    return row ? formatTransaction(row) : null
+  }
+
+  function getAllTransactions(filters = {}) {
+    const normalizedFilters = normalizeFilters(filters)
+    const where = buildWhereClause(normalizedFilters)
+    const order = buildOrderClause(normalizedFilters)
     const rows = database
       .prepare(`
         SELECT *
         FROM transactions
-        ORDER BY transaction_date DESC, id DESC
+        ${where.sql}
+        ${order}
       `)
-      .all()
+      .all(...where.parameters)
 
     return rows.map(formatTransaction)
   }
@@ -117,15 +196,17 @@ function createTransactionService(database) {
     const result = database
       .prepare(`
         INSERT INTO transactions (
+          user_id,
           type,
           amount_cents,
           category,
           transaction_date,
           description
         )
-        VALUES (?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?)
       `)
       .run(
+        transaction.userId || null,
         transaction.type,
         amountCents,
         transaction.category,
@@ -140,7 +221,7 @@ function createTransactionService(database) {
     }
   }
 
-  function updateTransaction(transactionId, transaction) {
+  function updateTransaction(transactionId, transaction, userId) {
     const amountCents = Math.round(Number(transaction.amount) * 100)
     const result = database
       .prepare(`
@@ -151,7 +232,7 @@ function createTransactionService(database) {
           category = ?,
           transaction_date = ?,
           description = ?
-        WHERE id = ?
+        WHERE id = ?${userId ? ' AND user_id = ?' : ''}
       `)
       .run(
         transaction.type,
@@ -160,6 +241,7 @@ function createTransactionService(database) {
         transaction.transactionDate,
         transaction.description || null,
         transactionId,
+        ...(userId ? [userId] : []),
       )
 
     if (result.changes === 0) {
@@ -173,10 +255,12 @@ function createTransactionService(database) {
     }
   }
 
-  function deleteTransaction(transactionId) {
+  function deleteTransaction(transactionId, userId) {
+    const ownershipClause = userId ? ' AND user_id = ?' : ''
+    const parameters = userId ? [transactionId, userId] : [transactionId]
     const result = database
-      .prepare('DELETE FROM transactions WHERE id = ?')
-      .run(transactionId)
+      .prepare(`DELETE FROM transactions WHERE id = ?${ownershipClause}`)
+      .run(...parameters)
 
     return result.changes > 0
   }
@@ -184,17 +268,51 @@ function createTransactionService(database) {
   function findTransactions(filters = {}) {
     const normalizedFilters = normalizeFilters(filters)
     const where = buildWhereClause(normalizedFilters)
+    const order = buildOrderClause(normalizedFilters)
     const rows = database
       .prepare(`
         SELECT *
         FROM transactions
         ${where.sql}
-        ORDER BY transaction_date DESC, id DESC
+        ${order}
         LIMIT ?
       `)
       .all(...where.parameters, normalizedFilters.limit)
 
     return rows.map(formatTransaction)
+  }
+
+  function getTransactionPage(filters = {}) {
+    const normalizedFilters = normalizeFilters(filters)
+    const where = buildWhereClause(normalizedFilters)
+    const order = buildOrderClause(normalizedFilters)
+    const transactions = database
+      .prepare(`
+        SELECT *
+        FROM transactions
+        ${where.sql}
+        ${order}
+        LIMIT ? OFFSET ?
+      `)
+      .all(
+        ...where.parameters,
+        normalizedFilters.limit,
+        normalizedFilters.offset,
+      )
+      .map(formatTransaction)
+    const total = database
+      .prepare(`SELECT COUNT(*) AS count FROM transactions ${where.sql}`)
+      .get(...where.parameters).count
+
+    return {
+      transactions,
+      pagination: {
+        total,
+        limit: normalizedFilters.limit,
+        offset: normalizedFilters.offset,
+        hasMore: normalizedFilters.offset + transactions.length < total,
+      },
+    }
   }
 
   function getFinancialSummary(filters = {}) {
@@ -260,13 +378,43 @@ function createTransactionService(database) {
     }))
   }
 
+  function getDailyBreakdown(filters = {}) {
+    const normalizedFilters = normalizeFilters(filters)
+    const where = buildWhereClause(normalizedFilters)
+    const rows = database
+      .prepare(`
+        SELECT
+          transaction_date,
+          COALESCE(SUM(CASE WHEN type = 'income' THEN amount_cents END), 0)
+            AS income_cents,
+          COALESCE(SUM(CASE WHEN type = 'expense' THEN amount_cents END), 0)
+            AS expense_cents,
+          COUNT(*) AS transaction_count
+        FROM transactions
+        ${where.sql}
+        GROUP BY transaction_date
+        ORDER BY transaction_date ASC
+      `)
+      .all(...where.parameters)
+
+    return rows.map((row) => ({
+      date: row.transaction_date,
+      income: row.income_cents / 100,
+      expense: row.expense_cents / 100,
+      transactionCount: row.transaction_count,
+    }))
+  }
+
   return {
     createTransaction,
     deleteTransaction,
     findTransactions,
     getCategoryBreakdown,
+    getDailyBreakdown,
     getAllTransactions,
     getFinancialSummary,
+    getTransactionPage,
+    getTransactionById,
     updateTransaction,
   }
 }

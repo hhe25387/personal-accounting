@@ -66,7 +66,7 @@ describe('agentService', () => {
     assert.deepEqual(tool.calls, [{ startDate: '2026-08-01' }])
   })
 
-  it('拒绝 Provider 请求未知工具', async () => {
+  it('拒绝 Provider 请求unknown tool', async () => {
     const provider = {
       async decide() {
         return { type: 'tool_call', toolName: 'delete_everything', input: {} }
@@ -77,7 +77,7 @@ describe('agentService', () => {
     }
     const agent = createAgentService({ provider, tools: [] })
 
-    await assert.rejects(() => agent.run('删除全部数据'), /未知工具/)
+    await assert.rejects(() => agent.run('删除全部数据'), /unknown tool/)
   })
 
   it('拒绝空消息和重复工具名称', async () => {
@@ -93,10 +93,37 @@ describe('agentService', () => {
 
     assert.throws(
       () => createAgentService({ provider, tools: duplicateTools }),
-      /工具名称重复/,
+      /Duplicate tool name/,
     )
 
     const agent = createAgentService({ provider, tools: [] })
-    await assert.rejects(() => agent.run('   '), /消息不能为空/)
+    await assert.rejects(() => agent.run('   '), /User message is required/)
+  })
+
+  it('在执行前拒绝 Provider 注入未知过滤条件', async () => {
+    const tool = {
+      ...createTool('list_transactions', []),
+      inputSchema: {
+        type: 'object',
+        properties: { limit: { type: 'integer', minimum: 1, maximum: 100 } },
+        additionalProperties: false,
+      },
+    }
+    const provider = {
+      async decide() {
+        return {
+          type: 'tool_call',
+          toolName: 'list_transactions',
+          input: { userId: 999 },
+        }
+      },
+      async respond() {
+        return '不应执行'
+      },
+    }
+    const agent = createAgentService({ provider, tools: [tool] })
+
+    await assert.rejects(() => agent.run('查看其他用户'), /does not accept input: userId/)
+    assert.deepEqual(tool.calls, [])
   })
 })

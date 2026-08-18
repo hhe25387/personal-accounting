@@ -2,22 +2,22 @@ const filterProperties = {
   type: {
     type: 'string',
     enum: ['income', 'expense'],
-    description: '账目类型：income 表示收入，expense 表示支出',
+    description: 'Transaction type: income or expense',
   },
   category: {
     type: 'string',
     minLength: 1,
-    description: '账目分类，例如餐饮、交通、工资或兼职',
+    description: 'Transaction category, such as Dining, Transport, Salary, or Side Income',
   },
   startDate: {
     type: 'string',
     pattern: '^\\d{4}-\\d{2}-\\d{2}$',
-    description: '查询开始日期，格式为 YYYY-MM-DD',
+    description: 'Start date in YYYY-MM-DD format',
   },
   endDate: {
     type: 'string',
     pattern: '^\\d{4}-\\d{2}-\\d{2}$',
-    description: '查询结束日期，格式为 YYYY-MM-DD',
+    description: 'End date in YYYY-MM-DD format',
   },
 }
 
@@ -29,7 +29,7 @@ function createInputSchema({ includeLimit = false } = {}) {
       type: 'integer',
       minimum: 1,
       maximum: 100,
-      description: '最多返回多少条账目，默认 100，最大 100',
+      description: 'Maximum entries to return; default and maximum are 100',
     }
   }
 
@@ -40,12 +40,35 @@ function createInputSchema({ includeLimit = false } = {}) {
   }
 }
 
-function createTransactionTools(transactionService) {
+function monthSchema() {
+  return {
+    type: 'object',
+    properties: {
+      month: {
+        type: 'string',
+        pattern: '^\\d{4}-\\d{2}$',
+        description: 'Month in YYYY-MM format; defaults to the current month',
+      },
+    },
+    additionalProperties: false,
+  }
+}
+
+function previousMonth(month) {
+  const [year, monthNumber] = month.split('-').map(Number)
+  const date = new Date(year, monthNumber - 2, 1)
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+}
+
+function createTransactionTools(transactionService, { now = () => new Date() } = {}) {
+  const resolveMonth = (input = {}) => input.month || getCurrentMonth(now())
+
   return [
     {
       name: 'list_transactions',
+      readOnly: true,
       description:
-        '按账目类型、分类和日期范围查询账目明细，也可用 limit 查询最近几笔账目。',
+        'List transactions by type, category, and date range. Use limit to return recent entries.',
       inputSchema: createInputSchema({ includeLimit: true }),
       async execute(input = {}) {
         return transactionService.findTransactions(input)
@@ -53,8 +76,9 @@ function createTransactionTools(transactionService) {
     },
     {
       name: 'get_financial_summary',
+      readOnly: true,
       description:
-        '计算指定类型、分类或日期范围内的总收入、总支出、余额和账目笔数。',
+        'Calculate total income, expenses, balance, and transaction count for the selected filters.',
       inputSchema: createInputSchema(),
       async execute(input = {}) {
         return transactionService.getFinancialSummary(input)
@@ -62,14 +86,63 @@ function createTransactionTools(transactionService) {
     },
     {
       name: 'get_category_breakdown',
+      readOnly: true,
       description:
-        '按分类统计指定日期范围内的金额、账目笔数和占比，并按金额从高到低排列；默认分析支出。',
+        'Summarize amounts, transaction counts, and percentages by category for a date range, sorted by amount descending. Defaults to expenses.',
       inputSchema: createInputSchema(),
       async execute(input = {}) {
         return transactionService.getCategoryBreakdown(input)
+      },
+    },
+    {
+      name: 'get_monthly_overview',
+      readOnly: true,
+      description:
+        'Return an authoritative monthly summary and expense category breakdown. Use for monthly summaries and practical suggestions.',
+      inputSchema: monthSchema(),
+      async execute(input = {}) {
+        const period = getMonthRange(resolveMonth(input))
+        const filters = { startDate: period.startDate, endDate: period.endDate }
+        return {
+          period,
+          summary: await transactionService.getFinancialSummary(filters),
+          categories: await transactionService.getCategoryBreakdown({
+            ...filters,
+            type: 'expense',
+          }),
+        }
+      },
+    },
+    {
+      name: 'compare_months',
+      readOnly: true,
+      description:
+        'Compare authoritative income, expenses, balance, and transaction counts between a selected month and the previous month.',
+      inputSchema: monthSchema(),
+      async execute(input = {}) {
+        const currentPeriod = getMonthRange(resolveMonth(input))
+        const previousPeriod = getMonthRange(previousMonth(currentPeriod.month))
+        const currentSummary = await transactionService.getFinancialSummary({
+          startDate: currentPeriod.startDate,
+          endDate: currentPeriod.endDate,
+        })
+        const previousSummary = await transactionService.getFinancialSummary({
+          startDate: previousPeriod.startDate,
+          endDate: previousPeriod.endDate,
+        })
+        return {
+          current: { period: currentPeriod, summary: currentSummary },
+          previous: { period: previousPeriod, summary: previousSummary },
+          change: {
+            income: currentSummary.totalIncome - previousSummary.totalIncome,
+            expense: currentSummary.totalExpense - previousSummary.totalExpense,
+            balance: currentSummary.balance - previousSummary.balance,
+          },
+        }
       },
     },
   ]
 }
 
 module.exports = createTransactionTools
+const { getCurrentMonth, getMonthRange } = require('../../reportingPeriod')

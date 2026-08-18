@@ -24,7 +24,7 @@ function createFakeService() {
 }
 
 describe('transactionTools', () => {
-  it('提供三个名称唯一的只读工具', () => {
+  it('提供五个名称唯一的只读工具', () => {
     const tools = createTransactionTools(createFakeService())
 
     assert.deepEqual(
@@ -33,10 +33,13 @@ describe('transactionTools', () => {
         'list_transactions',
         'get_financial_summary',
         'get_category_breakdown',
+        'get_monthly_overview',
+        'compare_months',
       ],
     )
     assert.equal(new Set(tools.map((tool) => tool.name)).size, tools.length)
     assert.equal(tools.every((tool) => typeof tool.execute === 'function'), true)
+    assert.equal(tools.every((tool) => tool.readOnly === true), true)
   })
 
   it('工具 Schema 禁止未知字段并限制查询数量', () => {
@@ -85,5 +88,29 @@ describe('transactionTools', () => {
 
     assert.deepEqual(service.calls, [['getCategoryBreakdown', input]])
     assert.equal(result[0].category, '餐饮')
+  })
+
+  it('月度概览只通过汇总和分类查询组合真实数据', async () => {
+    const service = createFakeService()
+    const tools = createTransactionTools(service, {
+      now: () => new Date(2026, 7, 17),
+    })
+    const tool = tools.find((item) => item.name === 'get_monthly_overview')
+
+    const result = await tool.execute({})
+
+    assert.deepEqual(result.period, {
+      month: '2026-08',
+      startDate: '2026-08-01',
+      endDate: '2026-08-31',
+    })
+    assert.deepEqual(service.calls, [
+      ['getFinancialSummary', { startDate: '2026-08-01', endDate: '2026-08-31' }],
+      ['getCategoryBreakdown', {
+        startDate: '2026-08-01',
+        endDate: '2026-08-31',
+        type: 'expense',
+      }],
+    ])
   })
 })

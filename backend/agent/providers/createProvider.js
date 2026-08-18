@@ -4,20 +4,20 @@ const providerFactories = {
   mock: () => createMockProvider(),
   deepseek: () => {
     throw new Error(
-      'DeepSeek Provider 尚未接入，请先将 AGENT_PROVIDER 设置为 mock',
+      'DeepSeek Provider is not connected yet. Set AGENT_PROVIDER to mock.',
     )
   },
 }
 
 function createProvider(config) {
   if (!config || typeof config.providerName !== 'string') {
-    throw new Error('Agent Provider 配置无效')
+    throw new Error('Invalid Agent Provider configuration')
   }
 
   const createSelectedProvider = providerFactories[config.providerName]
 
   if (!createSelectedProvider) {
-    throw new Error(`不支持的 Agent Provider：${config.providerName}`)
+    throw new Error(`Unsupported Agent Provider: ${config.providerName}`)
   }
 
   return createSelectedProvider(config.providers?.[config.providerName] || {})

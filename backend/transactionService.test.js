@@ -59,6 +59,65 @@ describe('transactionService', () => {
     assert.equal(transactions[0].amount, 100)
   })
 
+  it('按用户隔离账目、统计和修改权限', () => {
+    database
+      .prepare(`
+        INSERT INTO users (name, account, password_hash, password_salt)
+        VALUES (?, ?, ?, ?), (?, ?, ?, ?)
+      `)
+      .run(
+        '用户一', 'one@example.com', 'hash', 'salt',
+        '用户二', 'two@example.com', 'hash', 'salt',
+      )
+    const first = transactionService.createTransaction({
+      userId: 1,
+      type: 'expense',
+      amount: 100,
+      category: '购物',
+      transactionDate: '2026-08-03',
+    })
+    transactionService.createTransaction({
+      userId: 2,
+      type: 'income',
+      amount: 900,
+      category: '工资',
+      transactionDate: '2026-08-03',
+    })
+
+    assert.equal(transactionService.getAllTransactions({ userId: 1 }).length, 1)
+    assert.equal(
+      transactionService.getFinancialSummary({ userId: 1 }).totalExpense,
+      100,
+    )
+    assert.equal(transactionService.getFinancialSummary({ userId: 1 }).totalIncome, 0)
+    assert.equal(
+      transactionService.updateTransaction(
+        first.id,
+        {
+          type: 'expense', amount: 20, category: '购物',
+          transactionDate: '2026-08-03', description: '',
+        },
+        2,
+      ),
+      null,
+    )
+    assert.equal(transactionService.deleteTransaction(first.id, 2), false)
+    assert.equal(transactionService.deleteTransaction(first.id, 1), true)
+  })
+
+  it('按 ID 读取单笔账目并在不存在时返回 null', () => {
+    const transaction = transactionService.createTransaction({
+      type: 'expense',
+      amount: 88,
+      category: '购物',
+      transactionDate: '2026-08-12',
+      description: '生活用品',
+    })
+
+    assert.equal(transactionService.getTransactionById(transaction.id).amount, 88)
+    assert.equal(transactionService.getTransactionById(999), null)
+  })
+
   it('修改存在的账目并在找不到时返回 null', () => {
     const original = transactionService.createTransaction({
       type: 'expense',
@@ -134,6 +193,91 @@ describe('transactionService', () => {
     assert.equal(results[0].amount, 35)
   })
 
+  it('支持按日期或金额稳定排序', () => {
+    const transactions = [
+      ['expense', 20, '餐饮', '2026-08-01'],
+      ['expense', 80, '购物', '2026-08-03'],
+      ['income', 50, '兼职', '2026-08-02'],
+    ]
+
+    for (const [type, amount, category, transactionDate] of transactions) {
+      transactionService.createTransaction({
+        type,
+        amount,
+        category,
+        transactionDate,
+        description: '',
+      })
+    }
+
+    assert.deepEqual(
+      transactionService.getAllTransactions({ sortBy: 'amount', sortOrder: 'desc' })
+        .map((transaction) => transaction.amount),
+      [80, 50, 20],
+    )
+    assert.deepEqual(
+      transactionService.getAllTransactions({ sortBy: 'date', sortOrder: 'asc' })
+        .map((transaction) => transaction.transactionDate),
+      ['2026-08-01', '2026-08-02', '2026-08-03'],
+    )
+  })
+
+  it('按分类或备注关键词搜索并转义通配符', () => {
+    transactionService.createTransaction({
+      type: 'expense',
+      amount: 88,
+      category: '餐饮',
+      transactionDate: '2026-08-10',
+      description: '和朋友聚餐',
+    })
+    transactionService.createTransaction({
+      type: 'expense',
+      amount: 20,
+      category: '购物',
+      transactionDate: '2026-08-11',
+      description: '打折 20%',
+    })
+
+    assert.deepEqual(
+      transactionService.findTransactions({ keyword: '朋友' })
+        .map((transaction) => transaction.category),
+      ['餐饮'],
+    )
+    assert.equal(transactionService.findTransactions({ keyword: '餐饮' }).length, 1)
+    assert.equal(transactionService.findTransactions({ keyword: '%' }).length, 1)
+  })
+
+  it('按 25 笔分页并返回总数和是否还有更多', () => {
+    for (let index = 1; index <= 30; index += 1) {
+      transactionService.createTransaction({
+        type: 'expense',
+        amount: index,
+        category: '餐饮',
+        transactionDate: '2026-08-14',
+        description: `第 ${index} 笔`,
+      })
+    }
+
+    const firstPage = transactionService.getTransactionPage({
+      limit: 25,
+      offset: 0,
+    })
+    const secondPage = transactionService.getTransactionPage({
+      limit: 25,
+      offset: 25,
+    })
+
+    assert.equal(firstPage.transactions.length, 25)
+    assert.deepEqual(firstPage.pagination, {
+      total: 30,
+      limit: 25,
+      offset: 0,
+      hasMore: true,
+    })
+    assert.equal(secondPage.transactions.length, 5)
+    assert.equal(secondPage.pagination.hasMore, false)
+  })
+
   it('计算指定日期范围内的收入、支出和余额', () => {
     const transactions = [
       ['income', 1000, '工资', '2026-08-01'],
@@ -200,18 +344,74 @@ describe('transactionService', () => {
     ])
   })
 
+  it('按日期计算每日收入和支出趋势', () => {
+    const transactions = [
+      ['income', 1000, '工资', '2026-08-01'],
+      ['expense', 20, '餐饮', '2026-08-01'],
+      ['expense', 35.5, '交通', '2026-08-02'],
+      ['income', 400, '兼职', '2026-07-31'],
+    ]
+
+    for (const [type, amount, category, transactionDate] of transactions) {
+      transactionService.createTransaction({
+        type,
+        amount,
+        category,
+        transactionDate,
+        description: '',
+      })
+    }
+
+    assert.deepEqual(
+      transactionService.getDailyBreakdown({
+        startDate: '2026-08-01',
+        endDate: '2026-08-31',
+      }),
+      [
+        {
+          date: '2026-08-01',
+          income: 1000,
+          expense: 20,
+          transactionCount: 2,
+        },
+        {
+          date: '2026-08-02',
+          income: 0,
+          expense: 35.5,
+          transactionCount: 1,
+        },
+      ],
+    )
+  })
+
   it('拒绝未知字段、错误类型和过大的查询数量', () => {
     assert.throws(
       () => transactionService.findTransactions({ sql: 'DROP TABLE' }),
-      /不支持筛选字段/,
+      /Unsupported filter/,
     )
     assert.throws(
       () => transactionService.findTransactions({ type: 'other' }),
-      /type 必须是/,
+      /type must be/,
     )
     assert.throws(
       () => transactionService.findTransactions({ limit: 101 }),
-      /limit 必须是/,
+      /limit must be/,
+    )
+    assert.throws(
+      () => transactionService.findTransactions({ sortBy: 'description' }),
+      /sortBy must be/,
+    )
+    assert.throws(
+      () => transactionService.findTransactions({ sortOrder: 'sideways' }),
+      /sortOrder must be/,
+    )
+    assert.throws(
+      () => transactionService.findTransactions({ keyword: ' '.repeat(2) }),
+      /keyword must be/,
+    )
+    assert.throws(
+      () => transactionService.getTransactionPage({ offset: -1 }),
+      /offset must be/,
     )
   })
 })

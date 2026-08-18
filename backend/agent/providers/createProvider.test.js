@@ -21,7 +21,7 @@ describe('createProvider', () => {
           providerName: 'unknown',
           providers: {},
         }),
-      /不支持的 Agent Provider：unknown/,
+      /Unsupported Agent Provider: unknown/,
     )
   })
 
@@ -37,7 +37,7 @@ describe('createProvider', () => {
             },
           },
         }),
-      /DeepSeek Provider 尚未接入/,
+      /DeepSeek Provider is not connected yet/,
     )
   })
 })
