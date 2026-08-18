@@ -644,7 +644,16 @@ app.delete('/api/transactions/:id', (request, response) => {
   })
 })
 
-app.listen(PORT, () => {
-  console.log(`Backend server is running at http://localhost:${PORT}`)
-  console.log(`Financial assistant is using ${agentConfig.providerName} Provider`)
-})
+function startServer(port = PORT) {
+  const server = app.listen(port, () => {
+    const address = server.address()
+    const activePort = typeof address === 'object' ? address.port : port
+    console.log(`Backend server is running at http://localhost:${activePort}`)
+    console.log(`Financial assistant is using ${agentConfig.providerName} Provider`)
+  })
+  return server
+}
+
+if (require.main === module) startServer()
+
+module.exports = { app, startServer }
