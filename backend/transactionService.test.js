@@ -73,14 +73,14 @@ describe('transactionService', () => {
       userId: 1,
       type: 'expense',
       amount: 100,
-      category: '购物',
+      category: 'Shopping',
       transactionDate: '2026-08-03',
     })
     transactionService.createTransaction({
       userId: 2,
       type: 'income',
       amount: 900,
-      category: '工资',
+      category: 'Salary',
       transactionDate: '2026-08-03',
     })
 
@@ -94,7 +94,7 @@ describe('transactionService', () => {
       transactionService.updateTransaction(
         first.id,
         {
-          type: 'expense', amount: 20, category: '购物',
+          type: 'expense', amount: 20, category: 'Shopping',
           transactionDate: '2026-08-03', description: '',
         },
         2,
@@ -413,5 +413,68 @@ describe('transactionService', () => {
       () => transactionService.getTransactionPage({ offset: -1 }),
       /offset must be/,
     )
+  })
+
+  it('登录用户写入时严格校验金额、日期、分类和备注', () => {
+    database.prepare(`
+      INSERT INTO users (id, name, account, password_hash, password_salt)
+      VALUES (1, 'User One', 'one@example.com', 'hash', 'salt')
+    `).run()
+
+    const valid = transactionService.createTransaction({
+      userId: 1,
+      type: 'expense',
+      amount: '12.345',
+      category: 'dining',
+      transactionDate: '2026-02-28',
+      description: '  lunch  ',
+    })
+    assert.equal(valid.amount, 12.35)
+    assert.equal(valid.category, 'Dining')
+    assert.equal(valid.description, 'lunch')
+
+    const invalidEntries = [
+      { type: 'other', amount: 10, category: 'Dining', transactionDate: '2026-02-28' },
+      { type: 'expense', amount: -5, category: 'Dining', transactionDate: '2026-02-28' },
+      { type: 'expense', amount: 0.001, category: 'Dining', transactionDate: '2026-02-28' },
+      { type: 'expense', amount: 10, category: 'Dining', transactionDate: '2026-02-30' },
+      { type: 'expense', amount: 10, category: 'Missing', transactionDate: '2026-02-28' },
+      { type: 'expense', amount: 10, category: 'Salary', transactionDate: '2026-02-28' },
+      { type: 'expense', amount: 10, category: 'Dining', transactionDate: '2026-02-28', description: 'x'.repeat(501) },
+    ]
+    for (const entry of invalidEntries) {
+      assert.throws(
+        () => transactionService.createTransaction({ userId: 1, ...entry }),
+        TypeError,
+      )
+    }
+    assert.equal(transactionService.getAllTransactions({ userId: 1 }).length, 1)
+  })
+
+  it('编辑校验失败时保留原账目不变', () => {
+    database.prepare(`
+      INSERT INTO users (id, name, account, password_hash, password_salt)
+      VALUES (1, 'User One', 'one@example.com', 'hash', 'salt')
+    `).run()
+    const original = transactionService.createTransaction({
+      userId: 1,
+      type: 'expense',
+      amount: 20,
+      category: 'Dining',
+      transactionDate: '2026-08-11',
+      description: 'Lunch',
+    })
+
+    assert.throws(
+      () => transactionService.updateTransaction(original.id, {
+        type: 'expense',
+        amount: 25,
+        category: 'Missing',
+        transactionDate: '2026-08-11',
+      }, 1),
+      /Category is unavailable/,
+    )
+    assert.equal(transactionService.getTransactionById(original.id, 1).amount, 20)
+    assert.equal(transactionService.getTransactionById(original.id, 1).category, 'Dining')
   })
 })

@@ -29,7 +29,7 @@ describe('insightService', () => {
         userId: 1,
         type: 'expense',
         amount: 20,
-        category: '交通',
+        category: 'Transport',
         transactionDate: `2026-08-${String((index % dayCount) + 1).padStart(2, '0')}`,
       })
     }

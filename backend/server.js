@@ -574,75 +574,52 @@ app.post('/api/assistant', async (request, response) => {
 })
 
 app.post('/api/transactions', (request, response) => {
-  const { type, amount, category, transactionDate, description } = request.body
-
-  if (!type || !amount || !category || !transactionDate) {
-    return response.status(400).json({
-      message: 'Type, amount, category, and date are required',
+  try {
+    const transaction = createTransaction({
+      ...request.body,
+      userId: request.user.id,
     })
+    response.status(201).json({
+      message: 'Transaction saved',
+      transaction,
+    })
+  } catch (error) {
+    if (error instanceof TypeError) {
+      return response.status(400).json({ message: error.message })
+    }
+    console.error('Failed to save transaction:', error)
+    response.status(500).json({ message: 'Could not save the transaction right now' })
   }
-
-  const transaction = createTransaction({
-    userId: request.user.id,
-    type,
-    amount,
-    category,
-    transactionDate,
-    description,
-  })
-
-  response.status(201).json({
-    message: 'Transaction saved',
-    transaction,
-  })
 })
 
 app.put('/api/transactions/:id', (request, response) => {
   const transactionId = Number(request.params.id)
-  const { type, amount, category, transactionDate, description } = request.body
-
   if (!Number.isInteger(transactionId) || transactionId <= 0) {
     return response.status(400).json({
       message: 'Transactions ID  must be a positive integer',
     })
   }
 
-  if (!type || amount === '' || amount == null || !category || !transactionDate) {
-    return response.status(400).json({
-      message: 'Type, amount, category, and date are required',
+  try {
+    const transaction = updateTransaction(
+      transactionId,
+      request.body,
+      request.user.id,
+    )
+    if (!transaction) {
+      return response.status(404).json({ message: 'Transaction not found' })
+    }
+    response.json({
+      message: 'Transaction updated',
+      transaction,
     })
+  } catch (error) {
+    if (error instanceof TypeError) {
+      return response.status(400).json({ message: error.message })
+    }
+    console.error('Failed to update transaction:', error)
+    response.status(500).json({ message: 'Could not update the transaction right now' })
   }
-
-  const amountNumber = Number(amount)
-
-  if (!Number.isFinite(amountNumber) || amountNumber <= 0) {
-    return response.status(400).json({
-      message: 'Amount must be greater than 0',
-    })
-  }
-
-  const transaction = updateTransaction(
-    transactionId,
-    {
-      type,
-      amount: amountNumber,
-      category,
-      transactionDate,
-      description,
-    },
-    request.user.id,
-  )
-
-  if (!transaction) {
-    return response.status(404).json({
-      message: 'Transaction not found',
-    })
-  }
-
-  response.json({
-    message: 'Transaction updated',
-    transaction,
-  })
 })
 
 app.delete('/api/transactions/:id', (request, response) => {

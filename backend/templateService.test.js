@@ -35,7 +35,7 @@ describe('templateService', () => {
       name: '工作午餐',
       type: 'expense',
       amount: 28.5,
-      category: '餐饮',
+      category: 'Dining',
       description: '园区午餐',
       isPinned: true,
     })
@@ -43,7 +43,7 @@ describe('templateService', () => {
       name: '打车',
       type: 'expense',
       amount: '',
-      category: '交通',
+      category: 'Transport',
     })
 
     assert.equal(fixed.amount, 28.5)
@@ -59,7 +59,7 @@ describe('templateService', () => {
     const template = service.createTemplate(userOne, {
       name: '工资',
       type: 'income',
-      category: '工资',
+      category: 'Salary',
     })
 
     assert.deepEqual(service.getTemplates(userTwo), [])
@@ -71,10 +71,10 @@ describe('templateService', () => {
 
   it('记录使用次数并按常用程度重新排序', () => {
     const first = service.createTemplate(userOne, {
-      name: '午餐', type: 'expense', category: '餐饮',
+      name: '午餐', type: 'expense', category: 'Dining',
     })
     const second = service.createTemplate(userOne, {
-      name: '地铁', type: 'expense', category: '交通',
+      name: '地铁', type: 'expense', category: 'Transport',
     })
 
     const used = service.markTemplateUsed(first.id, userOne)
@@ -86,13 +86,13 @@ describe('templateService', () => {
 
   it('更新和删除自己的模板', () => {
     const template = service.createTemplate(userOne, {
-      name: '旧名称', type: 'expense', category: '购物',
+      name: '旧名称', type: 'expense', category: 'Shopping',
     })
     const updated = service.updateTemplate(template.id, userOne, {
       name: '日用品',
       type: 'expense',
       amount: 60,
-      category: '购物',
+      category: 'Shopping',
       description: '补货',
       isPinned: true,
     })
@@ -105,21 +105,55 @@ describe('templateService', () => {
 
   it('校验内容并限制每位用户最多十二个模板', () => {
     assert.throws(
-      () => service.createTemplate(userOne, { name: '', type: 'expense', category: '餐饮' }),
+      () => service.createTemplate(userOne, { name: '', type: 'expense', category: 'Dining' }),
       TypeError,
     )
     for (let index = 0; index < MAX_TEMPLATES_PER_USER; index += 1) {
       service.createTemplate(userOne, {
         name: `模板${index + 1}`,
         type: 'expense',
-        category: '餐饮',
+        category: 'Dining',
       })
     }
     assert.throws(
       () => service.createTemplate(userOne, {
-        name: '超出限制', type: 'expense', category: '餐饮',
+        name: '超出限制', type: 'expense', category: 'Dining',
       }),
       TemplateLimitError,
+    )
+  })
+
+  it('只允许当前用户可用且类型匹配的分类', () => {
+    database.prepare(`
+      INSERT INTO categories (user_id, type, name, is_default, is_active)
+      VALUES (?, 'expense', 'Pets', 0, 1),
+             (?, 'expense', 'Private One', 0, 1)
+    `).run(userOne, userTwo)
+
+    const template = service.createTemplate(userOne, {
+      name: '宠物用品',
+      type: 'expense',
+      category: 'pets',
+    })
+    assert.equal(template.category, 'Pets')
+
+    assert.throws(
+      () => service.createTemplate(userOne, {
+        name: '不存在', type: 'expense', category: 'Missing',
+      }),
+      /Category is unavailable/,
+    )
+    assert.throws(
+      () => service.createTemplate(userOne, {
+        name: '类型不符', type: 'expense', category: 'Salary',
+      }),
+      /Category is unavailable/,
+    )
+    assert.throws(
+      () => service.createTemplate(userOne, {
+        name: '他人分类', type: 'expense', category: 'Private One',
+      }),
+      /Category is unavailable/,
     )
   })
 })

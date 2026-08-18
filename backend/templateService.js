@@ -1,4 +1,5 @@
 const MAX_TEMPLATES_PER_USER = 12
+const { resolveAvailableCategory } = require('./ledgerValidation')
 
 class TemplateLimitError extends Error {
   constructor(message) {
@@ -15,7 +16,7 @@ function normalizePositiveInteger(value, fieldName) {
   return number
 }
 
-function normalizeTemplateInput(input = {}) {
+function normalizeTemplateInput(database, userId, input = {}) {
   const name = typeof input.name === 'string' ? input.name.trim() : ''
   if (!name || name.length > 20) {
     throw new TypeError('Template name must be 1 to 20 characters')
@@ -24,10 +25,11 @@ function normalizeTemplateInput(input = {}) {
     throw new TypeError('Template type must be income or expense')
   }
 
-  const category = typeof input.category === 'string' ? input.category.trim() : ''
-  if (!category || category.length > 40) {
-    throw new TypeError('Template category must be 1 to 40 characters')
-  }
+  const category = resolveAvailableCategory(database, {
+    category: input.category,
+    type: input.type,
+    userId,
+  })
 
   const description =
     typeof input.description === 'string' ? input.description.trim() : ''
@@ -92,7 +94,7 @@ function createTemplateService(database) {
 
   function createTemplate(userId, input) {
     const normalizedUserId = normalizePositiveInteger(userId, 'userId')
-    const template = normalizeTemplateInput(input)
+    const template = normalizeTemplateInput(database, normalizedUserId, input)
     const count = database
       .prepare('SELECT COUNT(*) AS count FROM transaction_templates WHERE user_id = ?')
       .get(normalizedUserId).count
@@ -123,7 +125,7 @@ function createTemplateService(database) {
   function updateTemplate(templateId, userId, input) {
     const normalizedTemplateId = normalizePositiveInteger(templateId, 'Template ID')
     const normalizedUserId = normalizePositiveInteger(userId, 'userId')
-    const template = normalizeTemplateInput(input)
+    const template = normalizeTemplateInput(database, normalizedUserId, input)
     const result = database
       .prepare(`
         UPDATE transaction_templates

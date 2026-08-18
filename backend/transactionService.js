@@ -1,3 +1,5 @@
+const { normalizeTransactionInput } = require('./ledgerValidation')
+
 function formatTransaction(row) {
   return {
     id: row.id,
@@ -192,7 +194,7 @@ function createTransactionService(database) {
   }
 
   function createTransaction(transaction) {
-    const amountCents = Math.round(Number(transaction.amount) * 100)
+    const normalized = normalizeTransactionInput(database, transaction)
     const result = database
       .prepare(`
         INSERT INTO transactions (
@@ -206,23 +208,30 @@ function createTransactionService(database) {
         VALUES (?, ?, ?, ?, ?, ?)
       `)
       .run(
-        transaction.userId || null,
-        transaction.type,
-        amountCents,
-        transaction.category,
-        transaction.transactionDate,
-        transaction.description || null,
+        normalized.userId,
+        normalized.type,
+        normalized.amountCents,
+        normalized.category,
+        normalized.transactionDate,
+        normalized.description || null,
       )
 
     return {
       id: Number(result.lastInsertRowid),
-      ...transaction,
-      amount: Number(transaction.amount),
+      type: normalized.type,
+      amount: normalized.amount,
+      category: normalized.category,
+      transactionDate: normalized.transactionDate,
+      description: normalized.description,
+      ...(normalized.userId === null ? {} : { userId: normalized.userId }),
     }
   }
 
   function updateTransaction(transactionId, transaction, userId) {
-    const amountCents = Math.round(Number(transaction.amount) * 100)
+    const normalized = normalizeTransactionInput(database, {
+      ...transaction,
+      userId,
+    })
     const result = database
       .prepare(`
         UPDATE transactions
@@ -235,11 +244,11 @@ function createTransactionService(database) {
         WHERE id = ?${userId ? ' AND user_id = ?' : ''}
       `)
       .run(
-        transaction.type,
-        amountCents,
-        transaction.category,
-        transaction.transactionDate,
-        transaction.description || null,
+        normalized.type,
+        normalized.amountCents,
+        normalized.category,
+        normalized.transactionDate,
+        normalized.description || null,
         transactionId,
         ...(userId ? [userId] : []),
       )
@@ -250,8 +259,11 @@ function createTransactionService(database) {
 
     return {
       id: transactionId,
-      ...transaction,
-      amount: Number(transaction.amount),
+      type: normalized.type,
+      amount: normalized.amount,
+      category: normalized.category,
+      transactionDate: normalized.transactionDate,
+      description: normalized.description,
     }
   }
 
