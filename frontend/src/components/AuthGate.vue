@@ -1,6 +1,7 @@
 <script setup>
 import { computed, nextTick, ref } from 'vue'
 import { useI18n } from '@/i18n'
+import { apiRequest } from '@/services/apiClient'
 
 const { language, setLanguage, t } = useI18n()
 
@@ -75,17 +76,15 @@ async function submitLogin() {
   statusMessage.value = 'Verifying your account…'
   statusTone.value = 'neutral'
   try {
-    const response = await fetch('http://localhost:3000/api/auth/login', {
+    const result = await apiRequest('/api/auth/login', {
       method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+      body: {
         account: loginAccount.value.trim(),
         password: loginPassword.value,
-      }),
+      },
+      fallbackMessage: 'Sign-in failed',
+      notifyUnauthorized: false,
     })
-    const result = await response.json()
-    if (!response.ok) throw new Error(result.message || 'Sign-in failed')
     statusTone.value = 'success'
     statusMessage.value = 'Signed in. Opening your ledger…'
     authenticate(result.user.name, result.user.account)
@@ -114,18 +113,16 @@ async function submitRegister() {
   statusMessage.value = 'Creating your account…'
   statusTone.value = 'neutral'
   try {
-    const response = await fetch('http://localhost:3000/api/auth/register', {
+    const result = await apiRequest('/api/auth/register', {
       method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+      body: {
         name: registerName.value.trim(),
         account: registerAccount.value.trim(),
         password: registerPassword.value,
-      }),
+      },
+      fallbackMessage: 'Registration failed',
+      notifyUnauthorized: false,
     })
-    const result = await response.json()
-    if (!response.ok) throw new Error(result.message || 'Registration failed')
     statusTone.value = 'success'
     statusMessage.value = 'Account created. Opening your ledger…'
     authenticate(result.user.name, result.user.account)

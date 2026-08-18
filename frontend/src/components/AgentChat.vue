@@ -1,6 +1,7 @@
 <script setup>
 import { nextTick, ref } from 'vue'
 import { useI18n } from '@/i18n'
+import { apiRequest } from '@/services/apiClient'
 
 const { language, t } = useI18n()
 
@@ -56,22 +57,14 @@ async function sendMessage(message = inputMessage.value) {
   await scrollToLatestMessage()
 
   try {
-    const response = await fetch('http://localhost:3000/api/assistant', {
+    const result = await apiRequest('/api/assistant', {
       method: 'POST',
-      credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
+      body: {
         message: normalizedMessage,
         language: language.value,
-      }),
+      },
+      fallbackMessage: 'The financial assistant cannot answer right now',
     })
-    const result = await response.json()
-
-    if (!response.ok) {
-      throw new Error(result.message || 'The financial assistant cannot answer right now')
-    }
 
     messages.value.push({
       role: 'assistant',

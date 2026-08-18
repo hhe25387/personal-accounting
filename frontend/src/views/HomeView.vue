@@ -8,6 +8,7 @@ import SummaryCards from '@/components/SummaryCards.vue'
 import TransactionForm from '@/components/TransactionForm.vue'
 import { defaultCategories } from '@/data/defaultCategories'
 import { useI18n } from '@/i18n'
+import { apiRequest } from '@/services/apiClient'
 
 const { t } = useI18n()
 
@@ -49,12 +50,10 @@ async function loadEntryBudget(month, { force = false } = {}) {
   loadedBudgetMonth = month
 
   try {
-    const response = await fetch(
-      `http://localhost:3000/api/budgets?month=${encodeURIComponent(month)}`,
-      { credentials: 'include' },
+    const result = await apiRequest(
+      `/api/budgets?month=${encodeURIComponent(month)}`,
+      { fallbackMessage: 'Could not load the budget' },
     )
-    const result = await response.json()
-    if (!response.ok) throw new Error(result.message || 'Could not load the budget')
     if (currentRequest === budgetRequestId) entryBudget.value = result
   } catch (error) {
     console.error('Could not load entry budget:', error)
@@ -82,16 +81,10 @@ async function loadMonthlySummary() {
 
   try {
     const month = currentMonth()
-    const response = await fetch(
-      `http://localhost:3000/api/statistics/summary?month=${month}`,
-      { credentials: 'include' },
+    monthlySummary.value = await apiRequest(
+      `/api/statistics/summary?month=${month}`,
+      { fallbackMessage: 'Could not load the monthly summary' },
     )
-
-    if (!response.ok) {
-      throw new Error('Could not load the monthly summary')
-    }
-
-    monthlySummary.value = await response.json()
   } catch (error) {
     console.error(error)
     monthlySummary.value = null
@@ -106,15 +99,9 @@ async function loadCategories() {
   categoriesError.value = ''
 
   try {
-    const response = await fetch('http://localhost:3000/api/categories', {
-      credentials: 'include',
+    categories.value = await apiRequest('/api/categories', {
+      fallbackMessage: 'Could not load categories',
     })
-
-    if (!response.ok) {
-      throw new Error('Could not load categories')
-    }
-
-    categories.value = await response.json()
   } catch (error) {
     console.error(error)
     categories.value = defaultCategories
@@ -128,11 +115,9 @@ async function loadTemplates() {
   templatesLoading.value = true
   templateError.value = ''
   try {
-    const response = await fetch('http://localhost:3000/api/templates', {
-      credentials: 'include',
+    const result = await apiRequest('/api/templates', {
+      fallbackMessage: 'Could not load templates',
     })
-    const result = await response.json()
-    if (!response.ok) throw new Error(result.message || 'Could not load templates')
     templates.value = result.templates
   } catch (error) {
     console.error(error)
@@ -146,17 +131,14 @@ async function saveTemplate({ id, payload }) {
   templateSaving.value = true
   templateError.value = ''
   try {
-    const response = await fetch(
-      `http://localhost:3000/api/templates${id ? `/${id}` : ''}`,
+    await apiRequest(
+      `/api/templates${id ? `/${id}` : ''}`,
       {
         method: id ? 'PUT' : 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: payload,
+        fallbackMessage: 'Could not save the template',
       },
     )
-    const result = await response.json()
-    if (!response.ok) throw new Error(result.message || 'Could not save the template')
     await loadTemplates()
     showFeedback(id ? 'Template updated' : 'Template saved')
   } catch (error) {
@@ -179,12 +161,10 @@ async function deleteTemplate(templateId) {
   templateSaving.value = true
   templateError.value = ''
   try {
-    const response = await fetch(`http://localhost:3000/api/templates/${templateId}`, {
+    await apiRequest(`/api/templates/${templateId}`, {
       method: 'DELETE',
-      credentials: 'include',
+      fallbackMessage: 'Could not delete the template',
     })
-    const result = await response.json()
-    if (!response.ok) throw new Error(result.message || 'Could not delete the template')
     await loadTemplates()
   } catch (error) {
     console.error(error)
@@ -201,11 +181,10 @@ function useTemplate(template) {
   }
   showFeedback(`Applied “${template.name}”. Confirm the amount before saving.`)
 
-  fetch(`http://localhost:3000/api/templates/${template.id}/use`, {
+  apiRequest(`/api/templates/${template.id}/use`, {
     method: 'POST',
-    credentials: 'include',
+    fallbackMessage: 'Could not record template usage',
   })
-    .then((response) => (response.ok ? response.json() : null))
     .then((result) => {
       if (result?.template) loadTemplates()
     })
@@ -217,25 +196,15 @@ async function createCategory(categoryInput) {
   categoryCreateError.value = ''
 
   try {
-    const response = await fetch('http://localhost:3000/api/categories', {
+    const result = await apiRequest('/api/categories', {
       method: 'POST',
-      credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(categoryInput),
+      body: categoryInput,
+      fallbackMessage: 'Could not add the category',
     })
-    const result = await response.json()
-
-    if (!response.ok) {
-      categoryCreateError.value = result.message || 'Could not add the category'
-      return
-    }
-
     categories.value.push(result.category)
   } catch (error) {
     console.error(error)
-    categoryCreateError.value = 'Cannot connect to the server'
+    categoryCreateError.value = error.message || 'Cannot connect to the server'
   } finally {
     categoryCreating.value = false
   }
@@ -250,24 +219,11 @@ async function saveTransaction(transaction) {
   clearFeedback()
 
   try {
-    const response = await fetch(
-      'http://localhost:3000/api/transactions',
-      {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(transaction),
-      },
-    )
-
-    const result = await response.json()
-
-    if (!response.ok) {
-      showFeedback(result.message || 'Could not save', 'error')
-      return
-    }
+    const result = await apiRequest('/api/transactions', {
+      method: 'POST',
+      body: transaction,
+      fallbackMessage: 'Could not save',
+    })
 
     await Promise.all([
       loadMonthlySummary(),
@@ -280,7 +236,12 @@ async function saveTransaction(transaction) {
     )
   } catch (error) {
     console.error(error)
-    showFeedback('Cannot connect to the server. Your form entries have been preserved.', 'error')
+    showFeedback(
+      error.message === 'Failed to fetch'
+        ? 'Cannot connect to the server. Your form entries have been preserved.'
+        : error.message,
+      'error',
+    )
   } finally {
     savingTransaction.value = false
   }

@@ -5,6 +5,7 @@ import TransactionForm from '@/components/TransactionForm.vue'
 import TransactionList from '@/components/TransactionList.vue'
 import { defaultCategories } from '@/data/defaultCategories'
 import { useI18n } from '@/i18n'
+import { apiRequest } from '@/services/apiClient'
 
 const { language, t, tc } = useI18n()
 
@@ -213,20 +214,25 @@ async function loadTransactions({ append = false } = {}) {
     params.set('limit', String(PAGE_SIZE))
     params.set('offset', String(requestedOffset))
     const compatibleParams = new URLSearchParams(params)
-    let response
     let result
+    let requestFailure
     for (let attempt = 0; attempt < 4; attempt += 1) {
       const query = compatibleParams.toString()
-      response = await fetch(`http://localhost:3000/api/transactions${query ? `?${query}` : ''}`, {
-        credentials: 'include',
-      })
-      result = await response.json()
-      if (response.ok) break
+      try {
+        result = await apiRequest(
+          `/api/transactions${query ? `?${query}` : ''}`,
+          { fallbackMessage: 'Could not load transactions' },
+        )
+        requestFailure = null
+        break
+      } catch (attemptError) {
+        requestFailure = attemptError
+      }
 
-      const unsupportedField = result.message?.match(
+      const unsupportedField = requestFailure.data?.message?.match(
         /^Unsupported filter: (sortBy|sortOrder|keyword|offset)$/,
       )?.[1]
-      if (!unsupportedField) break
+      if (!unsupportedField) throw requestFailure
       if (unsupportedField.startsWith('sort')) {
         compatibleParams.delete('sortBy')
         compatibleParams.delete('sortOrder')
@@ -235,7 +241,7 @@ async function loadTransactions({ append = false } = {}) {
         if (unsupportedField === 'offset') compatibleParams.delete('limit')
       }
     }
-    if (!response.ok) throw new Error(result.message || 'Could not load transactions')
+    if (requestFailure) throw requestFailure
     const serverPaginated = !Array.isArray(result)
     const rawTransactions = serverPaginated ? result.transactions : result
     const matchingTransactions = keepMatchingTransactions(rawTransactions, params)
@@ -291,11 +297,9 @@ function clearFilters() {
 
 async function loadCategories() {
   try {
-    const response = await fetch('http://localhost:3000/api/categories', {
-      credentials: 'include',
+    categories.value = await apiRequest('/api/categories', {
+      fallbackMessage: 'Could not load categories',
     })
-    if (!response.ok) throw new Error('Could not load categories')
-    categories.value = await response.json()
   } catch (loadError) {
     console.error(loadError)
     categories.value = defaultCategories
@@ -306,14 +310,11 @@ async function createCategory(categoryInput) {
   categoryCreating.value = true
   categoryCreateError.value = ''
   try {
-    const response = await fetch('http://localhost:3000/api/categories', {
+    const result = await apiRequest('/api/categories', {
       method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(categoryInput),
+      body: categoryInput,
+      fallbackMessage: 'Could not add the category',
     })
-    const result = await response.json()
-    if (!response.ok) throw new Error(result.message || 'Could not add the category')
     categories.value.push(result.category)
   } catch (createError) {
     console.error(createError)
@@ -337,17 +338,14 @@ async function updateTransaction(transaction) {
   saving.value = true
   editFeedback.value = ''
   try {
-    const response = await fetch(
-      `http://localhost:3000/api/transactions/${editingTransaction.value.id}`,
+    await apiRequest(
+      `/api/transactions/${editingTransaction.value.id}`,
       {
         method: 'PUT',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(transaction),
+        body: transaction,
+        fallbackMessage: 'Could not update the transaction',
       },
     )
-    const result = await response.json()
-    if (!response.ok) throw new Error(result.message || 'Could not update the transaction')
     editingTransaction.value = null
     await loadTransactions()
   } catch (updateError) {
@@ -362,12 +360,10 @@ async function updateTransaction(transaction) {
 async function deleteTransaction(transactionId) {
   if (!window.confirm(language.value === 'zh' ? '删除这笔账目？此操作无法撤销。' : 'Delete this transaction? This cannot be undone.')) return
   try {
-    const response = await fetch(
-      `http://localhost:3000/api/transactions/${transactionId}`,
-      { method: 'DELETE', credentials: 'include' },
+    await apiRequest(
+      `/api/transactions/${transactionId}`,
+      { method: 'DELETE', fallbackMessage: 'Could not delete the transaction' },
     )
-    const result = await response.json()
-    if (!response.ok) throw new Error(result.message || 'Could not delete the transaction')
     await loadTransactions()
   } catch (deleteError) {
     console.error(deleteError)

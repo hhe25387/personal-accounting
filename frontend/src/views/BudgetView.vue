@@ -2,6 +2,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 
 import { useI18n } from '@/i18n'
+import { apiRequest } from '@/services/apiClient'
 
 const { language, locale, t, tc } = useI18n()
 
@@ -94,22 +95,11 @@ function requestError(requestFailure) {
     : t(requestFailure.message)
 }
 
-async function readResponse(response, fallbackMessage) {
-  try {
-    return await response.json()
-  } catch {
-    throw new Error(response.ok ? fallbackMessage : 'Budget API is unavailable. Restart the backend server.')
-  }
-}
-
 async function loadCategories() {
   try {
-    const response = await fetch('http://localhost:3000/api/categories?type=expense', {
-      credentials: 'include',
+    categories.value = await apiRequest('/api/categories?type=expense', {
+      fallbackMessage: 'Could not load categories',
     })
-    const result = await readResponse(response, 'Could not load categories')
-    if (!response.ok) throw new Error(result.message || 'Could not load categories')
-    categories.value = result
   } catch (loadError) {
     console.error(loadError)
     error.value = requestError(loadError)
@@ -122,12 +112,10 @@ async function loadBudget() {
   error.value = ''
   editing.value = false
   try {
-    const response = await fetch(
-      `http://localhost:3000/api/budgets?month=${encodeURIComponent(selectedMonth.value)}`,
-      { credentials: 'include' },
+    const result = await apiRequest(
+      `/api/budgets?month=${encodeURIComponent(selectedMonth.value)}`,
+      { fallbackMessage: 'Could not load the budget' },
     )
-    const result = await readResponse(response, 'Could not load the budget')
-    if (!response.ok) throw new Error(result.message || 'Could not load the budget')
     if (currentRequest === requestId) budget.value = result
   } catch (loadError) {
     console.error(loadError)
@@ -162,23 +150,20 @@ async function saveBudget() {
   if (formError.value) return
   saving.value = true
   try {
-    const response = await fetch(
-      `http://localhost:3000/api/budgets/${selectedMonth.value}`,
+    const result = await apiRequest(
+      `/api/budgets/${selectedMonth.value}`,
       {
         method: 'PUT',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: {
           totalAmount: totalAmount.value === '' ? null : Number(totalAmount.value),
           categories: categoryRows.value.map((row) => ({
             category: row.category,
             amount: Number(row.amount),
           })),
-        }),
+        },
+        fallbackMessage: 'Could not save the budget',
       },
     )
-    const result = await readResponse(response, 'Could not save the budget')
-    if (!response.ok) throw new Error(result.message || 'Could not save the budget')
     budget.value = result.budget
     editing.value = false
   } catch (saveError) {
@@ -198,12 +183,10 @@ async function removeBudget() {
   if (!confirmed) return
   saving.value = true
   try {
-    const response = await fetch(
-      `http://localhost:3000/api/budgets/${selectedMonth.value}`,
-      { method: 'DELETE', credentials: 'include' },
+    await apiRequest(
+      `/api/budgets/${selectedMonth.value}`,
+      { method: 'DELETE', fallbackMessage: 'Could not remove the budget' },
     )
-    const result = await readResponse(response, 'Could not remove the budget')
-    if (!response.ok) throw new Error(result.message || 'Could not remove the budget')
     await loadBudget()
   } catch (removeError) {
     console.error(removeError)

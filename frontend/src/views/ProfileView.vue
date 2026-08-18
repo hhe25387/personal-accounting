@@ -1,6 +1,7 @@
 <script setup>
 import { computed, inject, ref } from 'vue'
 import { useI18n } from '@/i18n'
+import { apiRequest } from '@/services/apiClient'
 
 const { language, setLanguage, t } = useI18n()
 
@@ -44,14 +45,11 @@ async function saveProfile() {
   isSavingProfile.value = true
   profileStatus.value = { tone: 'neutral', message: t('Saving…') }
   try {
-    const response = await fetch('http://localhost:3000/api/account/profile', {
+    const result = await apiRequest('/api/account/profile', {
       method: 'PATCH',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name }),
+      body: { name },
+      fallbackMessage: 'Could not save',
     })
-    const result = await response.json()
-    if (!response.ok) throw new Error(result.message || 'Could not save')
     authContext.updateUser(result.user)
     profileName.value = result.user.name
     profileStatus.value = { tone: 'success', message: t('Display name saved') }
@@ -85,17 +83,14 @@ async function changePassword() {
   isChangingPassword.value = true
   passwordStatus.value = { tone: 'neutral', message: t('Updating password…') }
   try {
-    const response = await fetch('http://localhost:3000/api/account/password', {
+    await apiRequest('/api/account/password', {
       method: 'PUT',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+      body: {
         currentPassword: currentPassword.value,
         newPassword: newPassword.value,
-      }),
+      },
+      fallbackMessage: 'Could not change the password',
     })
-    const result = await response.json()
-    if (!response.ok) throw new Error(result.message || 'Could not change the password')
     currentPassword.value = ''
     newPassword.value = ''
     confirmPassword.value = ''

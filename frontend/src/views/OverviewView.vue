@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue'
 
 import SummaryCards from '@/components/SummaryCards.vue'
 import { useI18n } from '@/i18n'
+import { apiRequest } from '@/services/apiClient'
 
 const { language, locale, t, tc } = useI18n()
 
@@ -71,25 +72,17 @@ async function loadOverview() {
 
   try {
     const month = encodeURIComponent(selectedMonth.value)
-    const responses = await Promise.all([
-      fetch(`http://localhost:3000/api/statistics/summary?month=${month}`, {
-        credentials: 'include',
+    const [nextSummary, nextDailyData, nextCategoryData] = await Promise.all([
+      apiRequest(`/api/statistics/summary?month=${month}`, {
+        fallbackMessage: 'Could not load the monthly overview',
       }),
-      fetch(`http://localhost:3000/api/statistics/daily?month=${month}`, {
-        credentials: 'include',
+      apiRequest(`/api/statistics/daily?month=${month}`, {
+        fallbackMessage: 'Could not load the monthly overview',
       }),
-      fetch(
-        `http://localhost:3000/api/statistics/categories?month=${month}&type=expense`,
-        { credentials: 'include' },
-      ),
+      apiRequest(`/api/statistics/categories?month=${month}&type=expense`, {
+        fallbackMessage: 'Could not load the monthly overview',
+      }),
     ])
-
-    if (responses.some((response) => !response.ok)) {
-      throw new Error('Could not load the monthly overview')
-    }
-
-    const [nextSummary, nextDailyData, nextCategoryData] =
-      await Promise.all(responses.map((response) => response.json()))
 
     if (currentRequest !== requestId) return
     summary.value = nextSummary

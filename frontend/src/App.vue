@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, provide, ref } from 'vue'
+import { onBeforeUnmount, onMounted, provide, ref } from 'vue'
 import { RouterView } from 'vue-router'
 
 import AppShell from '@/components/AppShell.vue'
@@ -8,6 +8,7 @@ import ModeOnboarding from '@/components/ModeOnboarding.vue'
 import PersonalityWelcome from '@/components/PersonalityWelcome.vue'
 import { personalityFeatureEnabled } from '@/config/features'
 import { useI18n } from '@/i18n'
+import { ApiError, apiRequest, SESSION_EXPIRED_EVENT } from '@/services/apiClient'
 
 const { t } = useI18n()
 
@@ -104,11 +105,9 @@ function applyFeaturePolicy() {
 }
 
 async function loadUserPreferences() {
-  const response = await fetch('http://localhost:3000/api/preferences', {
-    credentials: 'include',
+  const result = await apiRequest('/api/preferences', {
+    fallbackMessage: 'Could not load user preferences',
   })
-  if (!response.ok) throw new Error('Could not load user preferences')
-  const result = await response.json()
   cachePreferences(result.preferences)
   applyFeaturePolicy()
 }
@@ -140,14 +139,11 @@ async function finishOnboarding(selection) {
   showPersonalityWelcome.value =
     selection.mode === 'personality' && Boolean(selection.profile)
   try {
-    const response = await fetch('http://localhost:3000/api/preferences', {
+    const result = await apiRequest('/api/preferences', {
       method: 'PUT',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ mode: selection.mode, profile: selection.profile }),
+      body: { mode: selection.mode, profile: selection.profile },
+      fallbackMessage: 'Could not save user preferences',
     })
-    if (!response.ok) throw new Error('Could not save user preferences')
-    const result = await response.json()
     cachePreferences(result.preferences)
   } catch (error) {
     console.error(error)
@@ -160,13 +156,17 @@ function finishWelcome() {
 
 async function logout() {
   try {
-    await fetch('http://localhost:3000/api/auth/logout', {
+    await apiRequest('/api/auth/logout', {
       method: 'POST',
-      credentials: 'include',
+      notifyUnauthorized: false,
     })
   } catch (error) {
     console.error(error)
   }
+  clearAuthenticatedState()
+}
+
+function clearAuthenticatedState() {
   authenticated.value = false
   onboardingComplete.value = false
   showPersonalityWelcome.value = false
@@ -182,11 +182,9 @@ function changeMode() {
 
 async function restoreSession() {
   try {
-    const response = await fetch('http://localhost:3000/api/auth/me', {
-      credentials: 'include',
+    const result = await apiRequest('/api/auth/me', {
+      notifyUnauthorized: false,
     })
-    if (!response.ok) return
-    const result = await response.json()
     updateUser(result.user)
     authenticated.value = true
     await loadUserPreferences()
@@ -195,13 +193,25 @@ async function restoreSession() {
       mode.value === 'personality' &&
       Boolean(personalityProfile.value)
   } catch (error) {
+    if (error instanceof ApiError && error.status === 401) return
     console.error(error)
   } finally {
     authChecking.value = false
   }
 }
 
-onMounted(restoreSession)
+function handleSessionExpired() {
+  clearAuthenticatedState()
+  authChecking.value = false
+}
+
+onMounted(() => {
+  window.addEventListener(SESSION_EXPIRED_EVENT, handleSessionExpired)
+  restoreSession()
+})
+onBeforeUnmount(() => {
+  window.removeEventListener(SESSION_EXPIRED_EVENT, handleSessionExpired)
+})
 </script>
 
 <template>
