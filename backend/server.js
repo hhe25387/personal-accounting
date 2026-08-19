@@ -20,6 +20,7 @@ const createBudgetService = require('./budgetService')
 const loadAgentConfig = require('./config/agentConfig')
 const database = require('./database')
 const createInsightService = require('./insightService')
+const createMonthlyReportService = require('./monthlyReportService')
 const createPersonalityService = require('./personalityService')
 const createPreferenceService = require('./preferenceService')
 const { getMonthRange } = require('./reportingPeriod')
@@ -42,6 +43,7 @@ const personalityService = createPersonalityService({
   insightService,
 })
 const preferenceService = createPreferenceService(database)
+const monthlyReportService = createMonthlyReportService(transactionService)
 const { createCategory, getCategories, hideCategory } = categoryService
 const {
   createTransaction,
@@ -175,6 +177,7 @@ app.use(
     '/api/account',
     '/api/templates',
     '/api/budgets',
+    '/api/reports',
   ],
   requireAuthentication,
 )
@@ -383,6 +386,23 @@ app.get('/api/statistics/categories', (request, response) => {
 
     console.error('Failed to load category breakdown:', error)
     response.status(500).json({ message: 'Could not load category breakdown right now' })
+  }
+})
+
+app.get('/api/reports/monthly', (request, response) => {
+  try {
+    response.json(
+      monthlyReportService.getMonthlyReport(
+        request.user.id,
+        request.query.month || undefined,
+      ),
+    )
+  } catch (error) {
+    if (error instanceof TypeError) {
+      return response.status(400).json({ message: error.message })
+    }
+    console.error('Failed to load monthly report:', error)
+    response.status(500).json({ message: 'Could not load the monthly report right now' })
   }
 })
 

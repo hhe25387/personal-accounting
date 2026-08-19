@@ -32,4 +32,12 @@ test('新用户可以注册、记录支出并在账目页查看', async ({ page 
   await expect(page).toHaveURL(/\/records$/)
   await expect(page.getByText('E2E team lunch')).toBeVisible()
   await expect(page.getByText('-¥42.50')).toBeVisible()
+
+  await page.getByRole('link', { name: 'Monthly Overview', exact: true }).click()
+
+  await expect(page).toHaveURL(/\/overview$/)
+  const monthlyReport = page.locator('.monthly-review')
+  await expect(monthlyReport.getByRole('heading', { name: 'Monthly Report' })).toBeVisible()
+  await expect(monthlyReport).toContainText('There is not enough previous-month data for a comparison yet.')
+  await expect(monthlyReport).toContainText('Dining')
 })

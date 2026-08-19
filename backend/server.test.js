@@ -182,3 +182,37 @@ describe('template HTTP validation', () => {
     assert.equal(rejected.response.status, 400)
   })
 })
+
+describe('monthly report HTTP API', () => {
+  it('只汇总当前用户的月度账目并拒绝非法月份', async () => {
+    const first = await registerUser('Monthly Report User')
+    const second = await registerUser('Other Monthly User')
+    const created = await apiRequest('/api/transactions', {
+      method: 'POST', cookie: first.cookie,
+      body: {
+        type: 'expense', amount: 88, category: 'Dining',
+        transactionDate: '2026-08-18', description: 'Monthly report meal',
+      },
+    })
+    assert.equal(created.response.status, 201)
+
+    const report = await apiRequest('/api/reports/monthly?month=2026-08', {
+      cookie: first.cookie,
+    })
+    assert.equal(report.response.status, 200)
+    assert.equal(report.result.summary.totalExpense, 88)
+    assert.equal(report.result.topCategory.category, 'Dining')
+
+    const otherReport = await apiRequest('/api/reports/monthly?month=2026-08', {
+      cookie: second.cookie,
+    })
+    assert.equal(otherReport.response.status, 200)
+    assert.equal(otherReport.result.dataLevel, 'empty')
+    assert.equal(otherReport.result.summary.totalExpense, 0)
+
+    const invalid = await apiRequest('/api/reports/monthly?month=2026-13', {
+      cookie: first.cookie,
+    })
+    assert.equal(invalid.response.status, 400)
+  })
+})
