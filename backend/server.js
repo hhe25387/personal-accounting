@@ -25,6 +25,7 @@ const createPersonalityService = require('./personalityService')
 const createPreferenceService = require('./preferenceService')
 const { getMonthRange } = require('./reportingPeriod')
 const createTransactionService = require('./transactionService')
+const createWeeklyReportService = require('./weeklyReportService')
 const {
   TemplateLimitError,
   createTemplateService,
@@ -44,6 +45,7 @@ const personalityService = createPersonalityService({
 })
 const preferenceService = createPreferenceService(database)
 const monthlyReportService = createMonthlyReportService(transactionService)
+const weeklyReportService = createWeeklyReportService(transactionService)
 const { createCategory, getCategories, hideCategory } = categoryService
 const {
   createTransaction,
@@ -403,6 +405,23 @@ app.get('/api/reports/monthly', (request, response) => {
     }
     console.error('Failed to load monthly report:', error)
     response.status(500).json({ message: 'Could not load the monthly report right now' })
+  }
+})
+
+app.get('/api/reports/weekly', (request, response) => {
+  try {
+    response.json(
+      weeklyReportService.getWeeklyReport(
+        request.user.id,
+        request.query.date || undefined,
+      ),
+    )
+  } catch (error) {
+    if (error instanceof TypeError) {
+      return response.status(400).json({ message: error.message })
+    }
+    console.error('Failed to load weekly report:', error)
+    response.status(500).json({ message: 'Could not load the weekly report right now' })
   }
 })
 

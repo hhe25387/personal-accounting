@@ -216,3 +216,35 @@ describe('monthly report HTTP API', () => {
     assert.equal(invalid.response.status, 400)
   })
 })
+
+describe('weekly report HTTP API', () => {
+  it('按当前用户和指定日期返回本周小结', async () => {
+    const first = await registerUser('Weekly Report User')
+    const second = await registerUser('Other Weekly User')
+    await apiRequest('/api/transactions', {
+      method: 'POST', cookie: first.cookie,
+      body: {
+        type: 'expense', amount: 32, category: 'Transport',
+        transactionDate: '2026-08-19', description: 'Weekly commute',
+      },
+    })
+
+    const report = await apiRequest('/api/reports/weekly?date=2026-08-19', {
+      cookie: first.cookie,
+    })
+    assert.equal(report.response.status, 200)
+    assert.equal(report.result.period.startDate, '2026-08-17')
+    assert.equal(report.result.summary.totalExpense, 32)
+    assert.equal(report.result.topCategories[0].category, 'Transport')
+
+    const otherReport = await apiRequest('/api/reports/weekly?date=2026-08-19', {
+      cookie: second.cookie,
+    })
+    assert.equal(otherReport.result.dataLevel, 'empty')
+
+    const invalid = await apiRequest('/api/reports/weekly?date=2026-02-30', {
+      cookie: first.cookie,
+    })
+    assert.equal(invalid.response.status, 400)
+  })
+})

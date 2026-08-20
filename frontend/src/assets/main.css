@@ -1523,10 +1523,11 @@
     order: 1;
     margin-bottom: 20px;
   }
-  .dashboard > .summary-area { order: 2; }
-  .dashboard > .dashboard-note { order: 3; }
-  .dashboard > .quick-templates { order: 4; }
-  .dashboard > .dashboard-entry > .split-calculator { order: 5; }
+  .dashboard > .weekly-summary { order: 2; }
+  .dashboard > .summary-area { order: 3; }
+  .dashboard > .dashboard-note { order: 4; }
+  .dashboard > .quick-templates { order: 5; }
+  .dashboard > .dashboard-entry > .split-calculator { order: 6; }
 
   .page-heading { display: block; }
   .page-heading h1 { font-size: clamp(2.55rem, 12vw, 4.3rem); }

@@ -6,6 +6,7 @@ import QuickTemplates from '@/components/QuickTemplates.vue'
 import SplitCalculator from '@/components/SplitCalculator.vue'
 import SummaryCards from '@/components/SummaryCards.vue'
 import TransactionForm from '@/components/TransactionForm.vue'
+import WeeklySummaryCard from '@/components/WeeklySummaryCard.vue'
 import { defaultCategories } from '@/data/defaultCategories'
 import { useI18n } from '@/i18n'
 import { apiRequest } from '@/services/apiClient'
@@ -32,12 +33,37 @@ const templateError = ref('')
 const templateSuggestion = ref({ template: null, revision: 0 })
 const lastSavedTransaction = ref(null)
 const entryBudget = ref(null)
+const weeklyReport = ref(null)
+const weeklyReportLoading = ref(true)
+const weeklyReportError = ref('')
 let loadedBudgetMonth = ''
 let budgetRequestId = 0
 
 function currentMonth() {
   const date = new Date()
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+}
+
+function currentDate() {
+  const date = new Date()
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+}
+
+async function loadWeeklyReport() {
+  weeklyReportLoading.value = true
+  weeklyReportError.value = ''
+  try {
+    weeklyReport.value = await apiRequest(
+      `/api/reports/weekly?date=${currentDate()}`,
+      { fallbackMessage: 'Could not load the weekly summary' },
+    )
+  } catch (error) {
+    console.error(error)
+    weeklyReport.value = null
+    weeklyReportError.value = 'The weekly summary is temporarily unavailable.'
+  } finally {
+    weeklyReportLoading.value = false
+  }
 }
 
 function monthFromDate(date) {
@@ -228,6 +254,7 @@ async function saveTransaction(transaction) {
     await Promise.all([
       loadMonthlySummary(),
       loadEntryBudget(monthFromDate(transaction.transactionDate), { force: true }),
+      loadWeeklyReport(),
     ])
     lastSavedTransaction.value = result.transaction
     savedRevision.value += 1
@@ -267,6 +294,7 @@ onMounted(() => {
   loadCategories()
   loadMonthlySummary()
   loadTemplates()
+  loadWeeklyReport()
 })
 </script>
 
@@ -286,6 +314,12 @@ onMounted(() => {
       :summary="monthlySummary"
       :loading="summaryLoading"
       :error="summaryError"
+    />
+
+    <WeeklySummaryCard
+      :report="weeklyReport"
+      :loading="weeklyReportLoading"
+      :error="weeklyReportError"
     />
 
     <section class="dashboard-note" :aria-label="t('Entry reminder')">
