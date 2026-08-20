@@ -145,6 +145,8 @@ const zh = {
   Income: '收入',
   'Entry type': '账目类型',
   'Focus amount field': '聚焦金额输入框',
+  'Quick tools': '快速工具',
+  'Close quick tool': '关闭快速工具',
   'How much did you spend?': '这次花了多少？',
   'How much did you receive?': '这次收入多少？',
   'What was it for?': '花在了哪里？',

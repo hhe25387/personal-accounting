@@ -1,13 +1,18 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useI18n } from '@/i18n'
 
 const { language, locale, t } = useI18n()
 
-const emit = defineEmits(['use-amount'])
+const props = defineProps({
+  initialTotal: { type: [Number, String], default: '' },
+  initialPeople: { type: Number, default: 2 },
+})
 
-const totalAmount = ref('')
-const peopleCount = ref(2)
+const emit = defineEmits(['use-amount', 'state-change'])
+
+const totalAmount = ref(props.initialTotal)
+const peopleCount = ref(props.initialPeople)
 
 const normalizedTotal = computed(() => Number(totalAmount.value) || 0)
 const perPersonAmount = computed(() => {
@@ -47,6 +52,13 @@ function formatMoney(amount) {
     maximumFractionDigits: 2,
   })
 }
+
+watch([totalAmount, peopleCount], () => {
+  emit('state-change', {
+    total: totalAmount.value,
+    people: peopleCount.value,
+  })
+})
 </script>
 
 <template>

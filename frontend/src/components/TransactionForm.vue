@@ -299,7 +299,10 @@ onUnmounted(() => document.removeEventListener('keydown', focusAmountWithShortcu
         <p class="eyebrow">{{ t(editingTransaction ? 'EDIT ENTRY' : 'QUICK ENTRY') }}</p>
         <h2>{{ t(editingTransaction ? 'Edit Entry' : 'Quick Entry') }}</h2>
       </div>
-      <span class="shortcut" :title="t('Focus amount field')">⌘ K</span>
+      <div class="panel-heading__actions">
+        <slot name="tools" />
+        <span class="shortcut" :title="t('Focus amount field')">⌘ K</span>
+      </div>
     </div>
 
     <form @submit.prevent="submitTransaction">

@@ -2,8 +2,7 @@
 import { onMounted, ref } from 'vue'
 
 import AgentChat from '@/components/AgentChat.vue'
-import QuickTemplates from '@/components/QuickTemplates.vue'
-import SplitCalculator from '@/components/SplitCalculator.vue'
+import QuickTools from '@/components/QuickTools.vue'
 import SummaryCards from '@/components/SummaryCards.vue'
 import TransactionForm from '@/components/TransactionForm.vue'
 import WeeklySummaryCard from '@/components/WeeklySummaryCard.vue'
@@ -327,20 +326,6 @@ onMounted(() => {
       <p><strong>{{ t('You do not need to plan everything today.') }}</strong> {{ t('Take 30 seconds to record one entry and let your ledger organize the rest.') }}</p>
     </section>
 
-    <QuickTemplates
-      :templates="templates"
-      :categories="categories"
-      :loading="templatesLoading"
-      :error="templateError"
-      :saving="templateSaving"
-      :last-transaction="lastSavedTransaction"
-      @use="useTemplate"
-      @create="createTemplate"
-      @update="updateTemplate"
-      @delete="deleteTemplate"
-      @retry="loadTemplates"
-    />
-
     <section class="dashboard-entry">
       <TransactionForm
         :categories="categories"
@@ -362,8 +347,24 @@ onMounted(() => {
         @create-category="createCategory"
         @clear-category-error="clearCategoryCreateError"
         @clear-feedback="clearFeedback"
-      />
-      <SplitCalculator @use-amount="useCalculatorAmount" />
+      >
+        <template #tools>
+          <QuickTools
+            :templates="templates"
+            :categories="categories"
+            :loading="templatesLoading"
+            :error="templateError"
+            :saving="templateSaving"
+            :last-transaction="lastSavedTransaction"
+            @use-template="useTemplate"
+            @create-template="createTemplate"
+            @update-template="updateTemplate"
+            @delete-template="deleteTemplate"
+            @retry-templates="loadTemplates"
+            @use-amount="useCalculatorAmount"
+          />
+        </template>
+      </TransactionForm>
     </section>
   </main>
 
