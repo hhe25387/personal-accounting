@@ -4,6 +4,8 @@ loadEnvironment()
 
 const cors = require('cors')
 const express = require('express')
+const fs = require('node:fs')
+const path = require('node:path')
 const {
   AuthConflictError,
   InvalidCredentialsError,
@@ -682,6 +684,19 @@ app.delete('/api/transactions/:id', (request, response) => {
     message: 'Transaction deleted',
   })
 })
+
+const frontendDistPath = path.resolve(__dirname, '../frontend/dist')
+const frontendIndexPath = path.join(frontendDistPath, 'index.html')
+
+if (fs.existsSync(frontendIndexPath)) {
+  app.use(express.static(frontendDistPath))
+  app.use((request, response, next) => {
+    if (request.method !== 'GET' || request.path.startsWith('/api')) return next()
+    response.sendFile(frontendIndexPath)
+  })
+} else if (process.env.NODE_ENV === 'production') {
+  console.warn('Frontend build not found. Run the root build command before starting production.')
+}
 
 function startServer(port = PORT) {
   const server = app.listen(port, () => {
