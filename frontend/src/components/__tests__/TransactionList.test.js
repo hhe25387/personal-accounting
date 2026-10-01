@@ -33,8 +33,8 @@ describe('TransactionList', () => {
     expect(wrapper.text()).toContain('兼职')
     expect(wrapper.text()).toContain('早餐')
 
-    expect(wrapper.get('.transaction-amount--income').text()).toBe('+$12.00')
-    expect(wrapper.get('.transaction-amount--expense').text()).toBe('-$25.50')
+    expect(wrapper.get('.transaction-amount--income').text()).toBe('+¥12.00')
+    expect(wrapper.get('.transaction-amount--expense').text()).toBe('-¥25.50')
   })
 
   it('点击删除按钮时传出对应账目的 ID', async () => {
@@ -68,5 +68,26 @@ describe('TransactionList', () => {
     await deleteButtons[1].trigger('click')
 
     expect(wrapper.emitted('delete')).toEqual([[2]])
+  })
+
+  it('点击编辑按钮时传出对应的完整账目', async () => {
+    const transaction = {
+      id: 3,
+      type: 'income',
+      amount: 500,
+      category: '工资',
+      transactionDate: '2026-08-11',
+      description: '八月工资',
+    }
+
+    const wrapper = mount(TransactionList, {
+      props: {
+        transactions: [transaction],
+      },
+    })
+
+    await wrapper.get('[data-test="edit-transaction"]').trigger('click')
+
+    expect(wrapper.emitted('edit')).toEqual([[transaction]])
   })
 })
